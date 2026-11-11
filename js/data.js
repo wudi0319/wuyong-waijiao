@@ -250,7 +250,7 @@ function condText(c){if(!c)return '';if(c.win)return '先通关任意一关';if(
 function buffOwned(r,id,all){const b=BUFFS[id];if(!b)return false;if(all)return true;if(!b.cost&&!b.unlock)return true;return !!(r.buffs&&r.buffs.includes(id))}
 function buffUnlocked(r,id,all){return condOk((BUFFS[id]||{}).unlock,r,all)}
 function debuffUnlocked(r,id,all){return condOk((DEBUFFS[id]||{}).unlock,r,all)}
-const ENEMY_STR=1.166; // 1.10×1.06：用户 2026-11-12 要求整体再难 6%
+const ENEMY_STR=1.283; // 1.10×1.06×1.10：用户 2026-11-12 又要求整体再难 10%
 const BRANCH={
   tower:{
     1:[{id:'volley',ic:'💫',name:'连珠',desc:'连射 3 发，分打不同敌人，每发 55% 伤害'},
