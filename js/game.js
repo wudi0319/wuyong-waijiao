@@ -160,9 +160,9 @@ function pushOut(o,r,en){const hit=en?(x,y)=>enemyBlock(x,y,r):(x,y)=>solidAt(x,
  for(let d=.2;d<3;d+=.18)for(let a=0;a<14;a++){const nx=o.x+Math.cos(a*Math.PI/7)*d,ny=o.y+Math.sin(a*Math.PI/7)*d;
   if(nx>.4&&ny>.4&&nx<MAP_W-.4&&ny<MAP_H-.4&&!hit(nx,ny)){o.x=nx;o.y=ny;return}}}
 // 寻路网格：有缺口就流向城堡，围死了就去打最近的墙
-const CELL=.5;let navW=0,navH=0,navBlock,navFriend,flowX,flowY,flowOk,navDirty=1;
+const CELL=.5;let navW=0,navH=0,navBlock,navFriend,flowX,flowY,flowOk,navDirty=1,tFlowX,tFlowY,tFlowOk;
 function rebuildNav(){navDirty=0;navW=Math.ceil(MAP_W/CELL)+1;navH=Math.ceil(MAP_H/CELL)+1;const n=navW*navH;navBlock=new Uint8Array(n);navFriend=new Uint8Array(n);
- for(let iy=0;iy<navH;iy++)for(let ix=0;ix<navW;ix++){const x=ix*CELL,y=iy*CELL,o=y<0||x<0||x>MAP_W||y>MAP_H;navBlock[iy*navW+ix]=o||(G&&enemyBlock(x,y,.45))?1:0;navFriend[iy*navW+ix]=o||(G&&solidAt(x,y,.35))?1:0}
+ for(let iy=0;iy<navH;iy++)for(let ix=0;ix<navW;ix++){const x=ix*CELL,y=iy*CELL,o=y<0||x<0||x>MAP_W||y>MAP_H;navBlock[iy*navW+ix]=o||(G&&enemyBlock(x,y,.45))?1:0;navFriend[iy*navW+ix]=o||(G&&solidAt(x,y,.28))?1:0}
  flowX=new Int8Array(n);flowY=new Int8Array(n);flowOk=new Uint8Array(n);const qx=new Int16Array(n),qy=new Int16Array(n);let qh=0,qt=0;
  const hx=Math.round(HOME.x/CELL),hy=Math.round(HOME.y/CELL),R=Math.ceil((HOME.r+.8)/CELL);
  for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const ix=hx+dx,iy=hy+dy;if(ix<0||iy<0||ix>=navW||iy>=navH||dx*dx+dy*dy>R*R)continue;const i=iy*navW+ix;if(navBlock[i]||flowOk[i])continue;flowOk[i]=1;qx[qt]=ix;qy[qt]=iy;qt++}
@@ -170,24 +170,42 @@ function rebuildNav(){navDirty=0;navW=Math.ceil(MAP_W/CELL)+1;navH=Math.ceil(MAP
  while(qh<qt){const cx=qx[qh],cy=qy[qh];qh++;
   for(const [dx,dy] of D){if(dx&&dy&&(navBlock[cy*navW+(cx+dx)]||navBlock[(cy+dy)*navW+cx]))continue;
    const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=navW||ny>=navH)continue;const i=ny*navW+nx;if(flowOk[i]||navBlock[i])continue;
-   flowOk[i]=1;flowX[i]=-dx;flowY[i]=-dy;qx[qt]=nx;qy[qt]=ny;qt++}}}
-function flowAt(x,y){if(navDirty||!flowOk)rebuildNav();const ix=clamp(Math.round(x/CELL),0,navW-1),iy=clamp(Math.round(y/CELL),0,navH-1),i=iy*navW+ix;return flowOk[i]?{ok:1,x:flowX[i],y:flowY[i]}:{ok:0}}
+   flowOk[i]=1;flowX[i]=-dx;flowY[i]=-dy;qx[qt]=nx;qy[qt]=ny;qt++}}
+ // 只看地形的流场：家被围死时，敌人沿它走到真正挡路的墙/建筑再砸，不会隔着河/悬崖干等
+ const tb=new Uint8Array(n);for(let iy=0;iy<navH;iy++)for(let ix=0;ix<navW;ix++){const x=ix*CELL,y=iy*CELL;tb[iy*navW+ix]=y<0||x<0||x>MAP_W||y>MAP_H||terrainBlock(x,y,.45)?1:0}
+ tFlowX=new Int8Array(n);tFlowY=new Int8Array(n);tFlowOk=new Uint8Array(n);qh=0;qt=0;
+ for(let dy=-R;dy<=R;dy++)for(let dx=-R;dx<=R;dx++){const ix=hx+dx,iy=hy+dy;if(ix<0||iy<0||ix>=navW||iy>=navH||dx*dx+dy*dy>R*R)continue;const i=iy*navW+ix;if(tb[i]||tFlowOk[i])continue;tFlowOk[i]=1;qx[qt]=ix;qy[qt]=iy;qt++}
+ while(qh<qt){const cx=qx[qh],cy=qy[qh];qh++;
+  for(const [dx,dy] of D){if(dx&&dy&&(tb[cy*navW+(cx+dx)]||tb[(cy+dy)*navW+cx]))continue;
+   const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=navW||ny>=navH)continue;const i=ny*navW+nx;if(tFlowOk[i]||tb[i])continue;
+   tFlowOk[i]=1;tFlowX[i]=-dx;tFlowY[i]=-dy;qx[qt]=nx;qy[qt]=ny;qt++}}}
+function tFlowAt(x,y){if(navDirty||!tFlowOk)rebuildNav();return flowLook(tFlowOk,tFlowX,tFlowY,x,y)}
+function terrainLine(x0,y0,x1,y1,r){const d=Math.hypot(x1-x0,y1-y0)||.001,n=Math.max(2,Math.ceil(d/.3));for(let i=1;i<=n;i++)if(terrainBlock(x0+(x1-x0)*i/n,y0+(y1-y0)*i/n,r))return false;return true}
+// 敌人半径比寻路格小，可能站在被标成"挡住"的格子里：这时先朝旁边最近的可走格走，而不是当成没路
+function flowLook(ok,fx,fy,x,y){const ix=clamp(Math.round(x/CELL),0,navW-1),iy=clamp(Math.round(y/CELL),0,navH-1),i=iy*navW+ix;if(ok[i])return{ok:1,x:fx[i],y:fy[i]};
+ let best=null,bd=1e9;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const jx=ix+dx,jy=iy+dy;if(jx<0||jy<0||jx>=navW||jy>=navH||!ok[jy*navW+jx])continue;const cx=jx*CELL,cy=jy*CELL,d=Math.hypot(cx-x,cy-y);if(d<bd){bd=d;best={ok:1,x:cx-x,y:cy-y}}}
+ if(best&&!best.x&&!best.y)best.x=.001;return best||{ok:0}}
+function flowAt(x,y){if(navDirty||!flowOk)rebuildNav();return flowLook(flowOk,flowX,flowY,x,y)}
 function lineClear(x0,y0,x1,y1,r,en){const d=Math.hypot(x1-x0,y1-y0)||.001,n=Math.max(2,Math.ceil(d/.3));for(let i=1;i<=n;i++){const x=x0+(x1-x0)*i/n,y=y0+(y1-y0)*i/n;if(en?enemySolid(x,y,r):solidAt(x,y,r))return false}return true}
 function nearestWall(x,y){let best=null,bd=1e9;for(const s of SPOTS){if(s.t!=='wall')continue;const b=G.b[s.id];if(!b.lv||b.dead)continue;const d=bDist(s,x,y);if(d<bd){bd=d;best=s}}return best}
 function astar(x0,y0,x1,y1,friend){if(navDirty||!navFriend)rebuildNav();const blk=friend?navFriend:navBlock;
  const ix0=clamp(Math.round(x0/CELL),0,navW-1),iy0=clamp(Math.round(y0/CELL),0,navH-1),ix1=clamp(Math.round(x1/CELL),0,navW-1),iy1=clamp(Math.round(y1/CELL),0,navH-1);
- const n=navW*navH,came=new Int32Array(n).fill(-1),cost=new Float32Array(n).fill(1e9),open=[];
+ const n=navW*navH,came=new Int32Array(n).fill(-1),cost=new Float32Array(n).fill(1e9);
  const idx=(x,y)=>y*navW+x,ok=(x,y)=>x>=0&&y>=0&&x<navW&&y<navH&&!blk[idx(x,y)];
  let sx=ix0,sy=iy0,gx=ix1,gy=iy1;
  if(!ok(sx,sy)){for(let d=1;d<=4&&!ok(sx,sy);d++)for(let a=0;a<8;a++){const x=ix0+Math.round(Math.cos(a*Math.PI/4)*d),y=iy0+Math.round(Math.sin(a*Math.PI/4)*d);if(ok(x,y)){sx=x;sy=y;break}}}
  if(!ok(gx,gy)){for(let d=1;d<=6&&!ok(gx,gy);d++)for(let a=0;a<8;a++){const x=ix1+Math.round(Math.cos(a*Math.PI/4)*d),y=iy1+Math.round(Math.sin(a*Math.PI/4)*d);if(ok(x,y)){gx=x;gy=y;break}}}
- cost[idx(sx,sy)]=0;open.push((sx<<16)|sy);const D=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.41],[1,-1,1.41],[-1,1,1.41],[-1,-1,1.41]];
- let found=-1,steps=0;
- while(open.length&&steps++<2800){let bi=0,bf=1e9;for(let i=0;i<open.length;i++){const v=open[i],x=v>>16,y=v&65535,f=cost[idx(x,y)]+Math.hypot(x-gx,y-gy);if(f<bf){bf=f;bi=i}}
-  const v=open.splice(bi,1)[0],cx=v>>16,cy=v&65535,ci=idx(cx,cy);if(cx===gx&&cy===gy){found=ci;break}
+ if(!ok(sx,sy))return null;
+ // 二叉堆 A*；目标到不了时走到离目标最近的可达格，不再原地顶墙
+ const hf=[],hi=[],push=(f,i)=>{let k=hf.length;hf.push(f);hi.push(i);while(k>0){const pk=(k-1)>>1;if(hf[pk]<=f)break;hf[k]=hf[pk];hi[k]=hi[pk];k=pk}hf[k]=f;hi[k]=i},
+  pop=()=>{const top=hi[0],lf=hf.pop(),li=hi.pop(),m=hf.length;if(m){let k=0;for(;;){let c=2*k+1;if(c>=m)break;if(c+1<m&&hf[c+1]<hf[c])c++;if(hf[c]>=lf)break;hf[k]=hf[c];hi[k]=hi[c];k=c}hf[k]=lf;hi[k]=li}return top};
+ const s0=idx(sx,sy);cost[s0]=0;push(Math.hypot(sx-gx,sy-gy),s0);const D=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,1.41],[1,-1,1.41],[-1,1,1.41],[-1,-1,1.41]];
+ const done=new Uint8Array(n);let found=-1,near=s0,nearH=Math.hypot(sx-gx,sy-gy);
+ while(hf.length){const ci=pop();if(done[ci])continue;done[ci]=1;const cx=ci%navW,cy=(ci-cx)/navW;if(cx===gx&&cy===gy){found=ci;break}
+  const h=Math.hypot(cx-gx,cy-gy);if(h<nearH){nearH=h;near=ci}
   for(const[dx,dy,c]of D){const nx=cx+dx,ny=cy+dy;if(!ok(nx,ny))continue;if(dx&&dy&&(blk[idx(cx+dx,cy)]||blk[idx(cx,cy+dy)]))continue;
-   const i=idx(nx,ny),nc=cost[ci]+c;if(nc<cost[i]){cost[i]=nc;came[i]=ci;open.push((nx<<16)|ny)}}}
- if(found<0)return null;const path=[];let i=found;while(i>=0&&path.length<240){path.push({x:(i%navW)*CELL,y:Math.floor(i/navW)*CELL});i=came[i]}path.reverse();return path}
+   const i=idx(nx,ny),nc=cost[ci]+c;if(nc<cost[i]){cost[i]=nc;came[i]=ci;push(nc+Math.hypot(nx-gx,ny-gy),i)}}}
+ if(found<0)found=near;const path=[];let i=found;while(i>=0&&path.length<n){path.push({x:(i%navW)*CELL,y:Math.floor(i/navW)*CELL});i=came[i]}path.reverse();return path}
 function unitRespawn(sid){const s=spotOf(sid),b=s&&G.b[s.id],lv=(b&&b.lv)||1,base=((s&&BUILD[s.t]||{}).rev||[20,16,12])[lv-1]||20;
  return Math.max(6,base*(G.mods.rev||1)*(1-(G.home.rev||0))*(hasPick(b,'horde')?0.8:1)*(hasPick(b,'rally')?0.7:1))}
 function flashHit(tg,x,y,slam){if(tg.kind==='home'){G.home.hurtT=1}else if(tg.kind==='b'){const b=G.b[tg.s.id];if(b)b.flash=.22}else if(tg.o)tg.o.flash=.18;
@@ -219,14 +237,16 @@ function stepEnemy(e,dt){const E=ENEMIES[e.k];e.cd-=dt;e.flash=Math.max(0,(e.fla
  e.rt-=dt;if(e.rt<=0){e.rt=.35;e.tg=null;let bd=E.aggro;
   for(const p of Object.values(G.players))if(!p.dead){const d=dist(p,e);if(d<bd){bd=d;e.tg={kind:'p',o:p}}}
   for(const u of G.units)if(!u.dead){const d=dist(u,e);if(d<bd){bd=d;e.tg={kind:'u',o:u}}}
-  if(!e.tg){let bb=.45+(E.smash?.9:0);for(const s of SPOTS){const b=G.b[s.id];if(!b.lv||b.dead)continue;const d=bDist(s,e.x,e.y);if(d<bb){bb=d;e.tg={kind:'b',s}}}}}
+  if(!e.tg){let bb=.45+(E.smash?.9:0);for(const s of SPOTS){const b=G.b[s.id];if(!b.lv||b.dead)continue;const d=bDist(s,e.x,e.y);if(d<bb){const q=bNear(s,e.x,e.y);if(!terrainLine(e.x,e.y,q.x,q.y,E.r*.6))continue;bb=d;e.tg={kind:'b',s}}}}}
  if(e.tg&&(e.tg.kind==='b'?G.b[e.tg.s.id].dead:e.tg.o.dead))e.tg=null;
  let tx,ty,tr,tg=e.tg;
  if(tg&&(tg.kind==='p'||tg.kind==='u')&&!lineClear(e.x,e.y,tg.o.x,tg.o.y,E.r*.55,1))tg=null;
  if(tg&&(tg.kind==='p'||tg.kind==='u')){tx=tg.o.x;ty=tg.o.y;tr=.3}
  else if(tg&&tg.kind==='b'){const q=bNear(tg.s,e.x,e.y);tx=q.x;ty=q.y;tr=tg.s.t==='wall'?0:.75}
  else{const fl=flowAt(e.x,e.y);if(fl.ok){if(!fl.x&&!fl.y){tx=HOME.x;ty=HOME.y;tr=HOME.r;tg={kind:'home'}}else{tx=e.x+fl.x;ty=e.y+fl.y;tr=0;tg={kind:'home'}}}
-  else{const w=nearestWall(e.x,e.y);if(w){tg={kind:'b',s:w};e.tg=tg;const q=bNear(w,e.x,e.y);tx=q.x;ty=q.y;tr=0}else{tx=HOME.x;ty=HOME.y;tr=HOME.r;tg={kind:'home'}}}}
+  else{const w=nearestWall(e.x,e.y),q=w&&bNear(w,e.x,e.y),tf=(!w||!terrainLine(e.x,e.y,q.x,q.y,E.r*.6))&&tFlowAt(e.x,e.y);
+   if(tf&&tf.ok&&(tf.x||tf.y)){tx=e.x+tf.x;ty=e.y+tf.y;tr=0;tg={kind:'home'}}
+   else if(w){tg={kind:'b',s:w};e.tg=tg;tx=q.x;ty=q.y;tr=0}else{tx=HOME.x;ty=HOME.y;tr=HOME.r;tg={kind:'home'}}}}
  const dx=tx-e.x,dy=ty-e.y,d=Math.hypot(dx,dy)||.001;e.moving=false;
  // 出手距离看真正的目标（城堡/人/建筑），不能看寻路格子，否则会在地图边上对空挥砸/扔石头
  const aa=aimOf(tg,e),dAtk=Math.hypot(aa.x-e.x,aa.y-e.y),reach=E.throw||(E.r+aa.r+.15);
@@ -235,24 +255,40 @@ function stepEnemy(e,dt){const E=ENEMIES[e.k];e.cd-=dt;e.flash=Math.max(0,(e.fla
  const nx=e.x+dx/d*sp,ny=e.y+dy/d*sp,bl=blocker(e,nx,ny);
  if(bl){if(e.cd<=0)startAtk(e,{kind:'b',s:bl});return}
  if(terrainBlock(nx,ny,E.r)){const ax=e.x+dx/d*sp,ay=e.y,bx=e.x,by=e.y+dy/d*sp;
-  if(!terrainBlock(ax,ay,E.r)&&!enemySolid(ax,ay,E.r)){e.x=ax;e.moving=true;e.ph+=dt*9;return}
-  if(!terrainBlock(bx,by,E.r)&&!enemySolid(bx,by,E.r)){e.y=by;e.moving=true;e.ph+=dt*9;return}return}
+  if(Math.abs(dx/d*sp)>1e-3&&!terrainBlock(ax,ay,E.r)&&!enemySolid(ax,ay,E.r)){e.x=ax;e.moving=true;e.ph+=dt*9;return}
+  if(Math.abs(dy/d*sp)>1e-3&&!terrainBlock(bx,by,E.r)&&!enemySolid(bx,by,E.r)){e.y=by;e.moving=true;e.ph+=dt*9;return}
+  // 两个方向都被地形挡住（贴着河岸/崖边）：先挪回最近的寻路格中心再继续
+  const gx=Math.round(e.x/CELL)*CELL-e.x,gy=Math.round(e.y/CELL)*CELL-e.y,gd=Math.hypot(gx,gy);
+  if(gd>.02){const k=Math.min(sp,gd)/gd,cx=e.x+gx*k,cy=e.y+gy*k;if(!terrainBlock(cx,cy,E.r)&&!enemySolid(cx,cy,E.r)){e.x=cx;e.y=cy;e.moving=true;e.ph+=dt*9}}return}
  e.x=nx;e.y=ny;e.moving=true;e.ph+=dt*9;if(Math.abs(dx)>.05)e.dir=dx<0?2:3}
 function unitAnchor(u){const A=G.army,L=A.leader&&G.players[A.leader];
  if(A.mode==='follow'&&L){if(!L.dead){A.x=L.x;A.y=L.y}}
  if(A.mode!=='camp'){const n=G.units.length,i=G.units.indexOf(u),a=i/n*Math.PI*2+(A.mode==='follow'?Math.PI/2:0),r=n>5?1.5:1.2;return{x:A.x+Math.cos(a)*r,y:A.y+Math.sin(a)*r*.8}}
  const a=u.slot*2.4+(u.k==='duck'?1.2:0),s=spotOf(u.home);return{x:s.x+Math.cos(a)*1.1,y:s.y+.6+Math.sin(a)*.7}}
+// 小兵卡在塔/墙角之间（两个方向都走不动）：挪到旁边一个可走的寻路格中心，挑离目标最近的
+function unstickUnit(u,sp,goal){if(navDirty||!navFriend)rebuildNav();const ix=Math.round(u.x/CELL),iy=Math.round(u.y/CELL);let best=null,bd=1e9;
+ for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const jx=ix+dx,jy=iy+dy;if(jx<0||jy<0||jx>=navW||jy>=navH||navFriend[jy*navW+jx])continue;const cx=jx*CELL,cy=jy*CELL,dd=Math.hypot(cx-u.x,cy-u.y);if(dd<.05)continue;
+  const n=Math.ceil(dd/.1);let clear=true;for(let k=1;k<=n;k++)if(solidAt(u.x+(cx-u.x)*k/n,u.y+(cy-u.y)*k/n,.26)){clear=false;break}if(!clear)continue;const sc=dd+Math.hypot(cx-goal.x,cy-goal.y)*.5;if(sc<bd){bd=sc;best={x:cx,y:cy,d:dd}}}
+ // 被塔和墙角围死在小缝里：允许像主角一样从塔身上钻出去
+ if(!best){const hx=Math.round(u.x/CELL),hy=Math.round(u.y/CELL);for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const jx=hx+dx,jy=hy+dy;if(jx<0||jy<0||jx>=navW||jy>=navH||navFriend[jy*navW+jx])continue;const cx=jx*CELL,cy=jy*CELL,dd=Math.hypot(cx-u.x,cy-u.y);if(dd<.05)continue;
+  const n=Math.ceil(dd/.1);let clear=true;for(let k=1;k<=n;k++)if(solidAt(u.x+(cx-u.x)*k/n,u.y+(cy-u.y)*k/n,.26,1)){clear=false;break}if(!clear)continue;const sc=dd+Math.hypot(cx-goal.x,cy-goal.y)*.5;if(sc<bd){bd=sc;best={x:cx,y:cy,d:dd,thru:1}}}}
+ if(best&&best.thru){u.escape={x:best.x,y:best.y};return}
+ if(best){const k=Math.min(sp,best.d)/best.d;u.x+=(best.x-u.x)*k;u.y+=(best.y-u.y)*k;u.path=null;u.pathT=0}}
 function stepUnit(u,dt){const U=UNITS[u.k],s=spotOf(u.home),b=G.b[s.id];u.flash=Math.max(0,(u.flash||0)-dt);
- if(u.dead){if(G.phase==='night'&&!b.dead){u.respawn-=dt;if(u.respawn<=0){u.dead=0;u.hp=u.max;u.x=s.x;u.y=s.y+.6}}return}
- u.cd-=dt;const an=unitAnchor(u);let goal=an,tg=null;
+ if(u.dead){if(G.phase==='night'&&!b.dead){u.respawn-=dt;if(u.respawn<=0){u.dead=0;u.hp=u.max;u.x=s.x;u.y=s.y+.6;u.escape=null;u.path=null}}return}
+ u.cd-=dt;const an=unitAnchor(u);if(solidAt(an.x,an.y,.26))pushOut(an,.26);let goal=an,tg=null;
  if(G.phase==='night'){tg=nearestEnemy(u.x,u.y,3.4*(G.mods.urange||1));if(tg&&dist(tg,an)>5.5*(G.mods.urange||1))tg=null}
  const dmg=U.dmg*G.mods.pet*(G.mods.udmg||1)*(1+.3*(b.lv-1))*campDmgMul(b)*(G.home.aura>1&&Math.hypot(u.x-HOME.x,u.y-HOME.y)<4.6?G.home.aura:1),rng=U.range*(G.mods.urange||1);
  if(tg){const d=dist(tg,u)-ENEMIES[tg.k].r;if(d<=rng){u.moving=false;if(u.cd<=0){u.cd=U.cd*(G.mods.ucd||1)*(hasPick(b,'fierce')?0.85:1);u.atk=.2;u.atkAt=G.t;if(u.k==='duck')shoot(u,tg,dmg,'bread',9,'u');else hurtEnemy(tg,dmg,0,'u')}u.dir=tg.x<u.x?2:3;return}goal=tg}
+ if(u.escape){const ex=u.escape.x-u.x,ey=u.escape.y-u.y,ed=Math.hypot(ex,ey),es=Math.min(ed,U.spd*dt);if(ed<.05||!solidAt(u.x,u.y,.26)&&ed<.3){u.escape=null}else{const nx=u.x+ex/ed*es,ny=u.y+ey/ed*es;if(!solidAt(nx,ny,.26,1)){u.x=nx;u.y=ny}else u.escape=null;u.moving=true;u.ph+=dt*12;return}}
  const dx=goal.x-u.x,dy=goal.y-u.y,d=Math.hypot(dx,dy);if(d<.15){u.moving=false;u.path=null;return}
  const sp=Math.min(d,U.spd*(G.mods.uspd||1)*dt*(d>3?1.4:1));let vx=dx/d,vy=dy/d;
- if(!lineClear(u.x,u.y,u.x+vx*Math.min(.8,d),u.y+vy*Math.min(.8,d),.26,0)){u.pathT=(u.pathT||0)-dt;if(!u.path||u.pathT<=0){u.path=astar(u.x,u.y,goal.x,goal.y,1);u.pathT=.45}
-  if(u.path&&u.path.length){while(u.path.length>1&&Math.hypot(u.path[0].x-u.x,u.path[0].y-u.y)<.35)u.path.shift();const q=u.path[0],pd=Math.hypot(q.x-u.x,q.y-u.y)||.001;vx=(q.x-u.x)/pd;vy=(q.y-u.y)/pd} }
- const nx=u.x+vx*sp,ny=u.y+vy*sp;if(!solidAt(nx,ny,.26)){u.x=nx;u.y=ny}else{const ox=u.x+vx*sp,oy=u.y;if(!solidAt(ox,u.y,.26))u.x=ox;if(!solidAt(u.x,u.y+vy*sp,.26))u.y+=vy*sp;pushOut(u,.26)}
+ // 近处整条线通了才直走；否则按路径走，避免在崖边/墙角来回横跳
+ const direct=d<8?lineClear(u.x,u.y,goal.x,goal.y,.26,0):(!u.path&&lineClear(u.x,u.y,u.x+vx*.8,u.y+vy*.8,.26,0));if(direct)u.path=null;
+ if(!direct){u.pathT=(u.pathT||0)-dt;if(!u.path||u.pathT<=0){u.path=astar(u.x,u.y,goal.x,goal.y,1);u.pathT=.45}
+  if(u.path&&u.path.length){while(u.path.length>1&&Math.hypot(u.path[0].x-u.x,u.path[0].y-u.y)<.35)u.path.shift();const q=u.path[0],pd=Math.hypot(q.x-u.x,q.y-u.y);if(u.path.length===1&&pd<.2){u.moving=false;return}vx=(q.x-u.x)/(pd||.001);vy=(q.y-u.y)/(pd||.001)} }
+ const nx=u.x+vx*sp,ny=u.y+vy*sp;if(!solidAt(nx,ny,.26)){u.x=nx;u.y=ny}else{const ux=u.x,uy=u.y,ox=u.x+vx*sp;if(!solidAt(ox,u.y,.26))u.x=ox;if(!solidAt(u.x,u.y+vy*sp,.26))u.y+=vy*sp;pushOut(u,.26);
+  if(u.x===ux&&u.y===uy)unstickUnit(u,sp,goal)}
  u.moving=true;u.ph+=dt*12;if(Math.abs(vx)>.05)u.dir=vx<0?2:3}
 // 被圆形建筑（塔/营地/菜园）挡住时，顺着边绕过去，不会卡住
 function slideAround(p,inp,sp){let best=null,bd=1.4;for(const s of SPOTS){const b=G.b[s.id];if(!b.lv||b.dead||s.t==='wall')continue;const d=Math.hypot(p.x-s.x,p.y-s.y);if(d<bd){bd=d;best=s}}
