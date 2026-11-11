@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="无用外交">
+<meta name="theme-color" content="#7cc96b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<title>无用外交</title>
+<link rel="stylesheet" href="style.css?v=1">
+</head><body>
+<main id="stage"><canvas id="map"></canvas>
+ <div id="hud">
+  <div class="pill" id="hGold">💰 0</div>
+  <div class="pill" id="hNight">☀️ 第1天</div>
+  <div class="bars"><div class="bar"><span>🏰</span><i><b id="hHome"></b></i></div><div class="bar"><span id="hMe">🤴</span><i><b id="hHp"></b></i></div></div>
+  <button id="pauseBtn" aria-label="暂停">⏸</button>
+ </div>
+ <div id="hint"></div>
+ <div id="toast"></div>
+ <div id="joy"><div id="knob"></div></div>
+ <div id="acts">
+  <div id="armyRow" class="armyRow hidden"><button id="followBtn" class="act sq">⚔️ 跟随</button><button id="deployBtn" class="act sq">🚩 原地部署</button></div>
+  <button id="homeBtn" class="act home hidden"></button>
+  <button id="buildBtn" class="act hidden"></button>
+  <button id="razedBtn" class="act hidden"></button>
+  <button id="skillBtn" class="act round hidden"><span id="skillName">技能</span><em id="skillCd"></em></button>
+  <button id="nightBtn" class="act night hidden">🌙 开始入夜</button>
+ </div>
+</main>
+<div id="start" class="ov"><div class="card">
+ <h1>🏰 无用外交</h1>
+ <p class="sub">白天建造，晚上守住国王的城堡！</p>
+ <b class="start-k-dog">选国王</b>
+ <div class="row pick" id="pickDog">
+  <button data-dog="yellow" class="on"><canvas width="96" height="96"></canvas>红袍国王</button>
+  <button data-dog="white"><canvas width="96" height="96"></canvas>蓝袍国王</button>
+ </div>
+ <b class="start-k-weap">带什么武器</b>
+ <div class="row pick" id="pickWeapon"></div>
+ <b class="start-k-map">选关卡</b>
+ <div class="maps pick" id="pickMap"></div>
+ <p class="mapDesc" id="mapDesc"></p>
+ <button id="goBtn" class="big">出发！</button>
+ <p class="rec" id="rec"></p>
+</div></div>
+<div id="pause" class="ov hidden"><div class="card"><div class="bigic">⏸</div><h2>暂停中</h2><button id="resumeBtn" class="big">继续</button><div class="row" style="margin-top:12px"><button id="muteBtn" class="sm"></button><button id="quitBtn" class="sm">回到开始</button></div><p class="sub" style="margin-top:10px">电脑上：WASD 走路 · E 建造 / 升级城堡 · N 入夜 · 空格 技能 · F 跟随/部署 · P 暂停</p></div></div>
+<div id="prep" class="ov hidden"><div class="card prep-card">
+ <h2 id="prepTitle">准备出发</h2>
+ <p class="prep-stars" id="prepStars"></p>
+ <p class="prep-map" id="prepMap"></p>
+ <div class="cat-tabs" id="prepTabs"></div>
+ <b class="prep-k-buff">带上加成（最多 3 个，用星星兑换）</b>
+ <div class="buffs" id="pickBuff"></div>
+ <b class="prep-k-deb">挑战（增加难度，通关星星更多）</b>
+ <div class="debuffs" id="pickDebuff"></div>
+ <p class="prep-forecast" id="prepForecast"></p>
+ <div class="row prep-acts"><button id="prepBack" class="sm">返回</button><button id="prepGo" class="big">开始游戏</button></div>
+</div></div>
+<div id="branch" class="ov hidden"><div class="card branch-card">
+ <h2 id="branchTitle">建造</h2>
+ <p class="sub" id="branchSub">选一个路线</p>
+ <div class="branch-choices" id="branchChoices"></div>
+ <button id="branchCancel" class="sm" style="margin-top:10px">先不建</button>
+</div></div>
+<div id="homeUp" class="ov hidden"><div class="card">
+ <h2 id="homeUpTitle">🏰 升级城堡</h2>
+ <p class="sub" id="homeBottleLab">先给城堡的连弩选一条路</p>
+ <div class="branch-choices" id="homeBottle"></div>
+ <p class="sub" id="homeUpSub">再选一个城堡加成，本局最多升 3 次</p>
+ <div class="home-choices" id="homeUpChoices"></div>
+ <button id="homeUpCancel" class="sm" style="margin-top:10px">先不升</button>
+</div></div>
+<div id="end" class="ov hidden"><div class="card"><div id="endIcon" class="bigic"></div><h2 id="endTitle"></h2><p id="endStars" class="end-stars"></p><p id="endText"></p><p id="endUnlock" class="unl"></p><button id="againBtn" class="big">再来一次</button></div></div>
+<script src="js/sfx.js?v=1"></script>
+<script src="js/sprites.js?v=1"></script>
+<script src="js/data.js?v=1"></script>
+<script src="js/game.js?v=1"></script>
+<script src="js/ui.js?v=1"></script>
+</body></html>
