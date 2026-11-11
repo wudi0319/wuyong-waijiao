@@ -114,6 +114,8 @@ function armyFollow(pid){if(!G.units.length){hooks.toast('先建刀斧营或弓�
 function armyDeploy(pid){if(!G.units.length){hooks.toast('先建刀斧营或弓箭营吧');return}const p=G.players[pid];G.army.mode='deploy';G.army.leader=null;G.army.x=p.x;G.army.y=p.y;sfx('click');hooks.toast('🚩 士兵们守在这里！')}
 function toggleArmy(pid){G.army.mode==='follow'?armyDeploy(pid):armyFollow(pid)}
 // ---- 战斗 ----
+// 击退：一步步推，碰到悬崖/河/地图边就停，不会把敌人打到崖下或对岸
+function knockE(e,dx,dy){const r=ENEMIES[e.k].r,n=Math.max(1,Math.ceil(Math.hypot(dx,dy)/.1));for(let i=0;i<n;i++){const nx=e.x+dx/n,ny=e.y+dy/n;if(nx<.4||ny<.4||nx>MAP_W-.4||ny>MAP_H-.4||terrainBlock(nx,ny,r)||(!enemySolid(e.x,e.y,r)&&enemySolid(nx,ny,r)))break;e.x=nx;e.y=ny}}
 function hurtEnemy(e,d,stun,byP){if(e.dead)return;e.hp-=d;e.flash=.12;if(stun)e.stun=Math.max(e.stun||0,stun);
  if(byP===1){sfx('hit');const me=G.players[G.me];if(me)me.combat=G.t;if(G.floats.length<70)G.floats.push({x:e.x+(Math.random()-.5)*.4,y:e.y-ENEMIES[e.k].r*2-.3,txt:''+Math.round(d),t:.25,col:'#fff',sm:1})}
  if(byP==='u'&&G.mods.slow)e.slowT=Math.max(e.slowT||0,1.2);
@@ -133,7 +135,7 @@ function enemiesNear(x,y,r){return G.enemies.filter(e=>!e.dead&&Math.hypot(e.x-x
 function nearestEnemy(x,y,r){let best=null,bd=1e9;for(const e of G.enemies){if(e.dead)continue;const d=Math.hypot(e.x-x,e.y-y)-ENEMIES[e.k].r;if(d<=r&&d<bd){bd=d;best=e}}return best}
 function shoot(from,tgt,dmg,kind,spd=10,byP){G.shots.push({x:from.x,y:from.y-.5,tgt,tx:tgt.x,ty:tgt.y,dmg,kind,spd,t:0,byP})}
 function skill(pid){const p=G.players[pid];if(!p||p.dead||p.skillCd>0||G.phase!=='night')return false;const W=WEAPONS[p.weapon];p.skillCd=W.skill.cd*(G.mods.scd||1);p.skillT=.5;p.combat=G.t;
- if(p.weapon==='spatula'){for(const e of enemiesNear(p.x,p.y,2.7)){hurtEnemy(e,45*(G.mods.pdmg||1),0,1);const a=Math.atan2(e.y-p.y,e.x-p.x);e.x+=Math.cos(a)*.9;e.y+=Math.sin(a)*.9}G.fx.push({k:'spin',x:p.x,y:p.y,t:0,life:.45,r:2.7})}
+ if(p.weapon==='spatula'){for(const e of enemiesNear(p.x,p.y,2.7)){hurtEnemy(e,45*(G.mods.pdmg||1),0,1);const a=Math.atan2(e.y-p.y,e.x-p.x);knockE(e,Math.cos(a)*.9,Math.sin(a)*.9)}G.fx.push({k:'spin',x:p.x,y:p.y,t:0,life:.45,r:2.7})}
  else if(p.weapon==='frisbee'){for(let i=0;i<10;i++){const a=i/10*Math.PI*2;G.shots.push({x:p.x,y:p.y-.4,vx:Math.cos(a)*9,vy:Math.sin(a)*9,life:.8,dmg:26*(G.mods.pdmg||1),kind:'frisbee',hit:new Set(),t:0,byP:1})}}
  else{for(const e of enemiesNear(p.x,p.y,3.3))hurtEnemy(e,70*(G.mods.pdmg||1),1.6,1);G.shake=.25;G.fx.push({k:'quake',x:p.x,y:p.y,t:0,life:.6,r:3.3})}
  sfx('skill');hooks.toast(W.skill.name+'！');return true}
@@ -142,7 +144,7 @@ function inFan(p,e,range){const dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy),er=(EN
  let da=Math.atan2(dy,dx)-faceAng(p);while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;return Math.abs(da)<=Math.PI/2+1e-4}
 function playerAttack(p,dt){const W=WEAPONS[p.weapon];p.cd-=dt;p.skillCd=Math.max(0,p.skillCd-dt);if(p.cd>0)return;
  const range=W.range*(G.mods.prange||1),tg=nearestEnemy(p.x,p.y,range);if(!tg)return;p.cd=W.cd*(G.mods.pacd||1);p.swing=.3;p.combat=G.t;p.face={x:tg.x-p.x,y:tg.y-p.y};
- if(W.kind==='melee'){const ang=Math.atan2(tg.y-p.y,tg.x-p.x);enemiesNear(p.x,p.y,range).forEach(e=>{if(!inFan(p,e,range))return;hurtEnemy(e,W.dmg*(G.mods.pdmg||1),0,1);const a=Math.atan2(e.y-p.y,e.x-p.x);e.x+=Math.cos(a)*.15;e.y+=Math.sin(a)*.15});G.fx.push({k:'fan',x:p.x,y:p.y,a:ang,t:0,life:.3,r:range,w:p.weapon})}
+ if(W.kind==='melee'){const ang=Math.atan2(tg.y-p.y,tg.x-p.x);enemiesNear(p.x,p.y,range).forEach(e=>{if(!inFan(p,e,range))return;hurtEnemy(e,W.dmg*(G.mods.pdmg||1),0,1);const a=Math.atan2(e.y-p.y,e.x-p.x);knockE(e,Math.cos(a)*.15,Math.sin(a)*.15)});G.fx.push({k:'fan',x:p.x,y:p.y,a:ang,t:0,life:.3,r:range,w:p.weapon})}
  else if(W.kind==='ranged')shoot(p,tg,W.dmg*(G.mods.pdmg||1),'frisbee',11,1);
  else{enemiesNear(p.x,p.y,range).forEach(e=>hurtEnemy(e,W.dmg*(G.mods.pdmg||1),.3,1));G.shake=Math.max(G.shake,.12);G.fx.push({k:'slam',x:p.x,y:p.y,t:0,life:.35,r:range});G.fx.push({k:'arc',x:p.x,y:p.y,a:Math.atan2(tg.y-p.y,tg.x-p.x),t:0,life:.26,r:Math.min(range,1.8),w:p.weapon})}}
 // 墙段碰撞：敌人整段（含门）都过不去；自己人可以从门洞穿过
@@ -156,9 +158,12 @@ function enemySolid(x,y,r){for(const s of SPOTS){const b=G&&G.b[s.id];if(!b||!b.
 function enemyBlock(x,y,r){return terrainBlock(x,y,r)||!!enemySolid(x,y,r)}
 function solidAt(x,y,r,hero){if(terrainBlock(x,y,r))return true;for(const s of SPOTS){const b=G&&G.b[s.id];if(!b||!b.lv||b.dead)continue;if(hero&&s.t==='tower')continue;if(s.t==='wall'){if(wallHit(s,x,y,r,1))return true}else if(Math.hypot(x-s.x,y-s.y)<.6+r)return true}return false}
 function blocker(e,nx,ny){return enemySolid(nx,ny,ENEMIES[e.k].r)}
+// 被挤进墙/建筑里时挪到最近的空地；先只找"不隔着悬崖/河"的空地，避免把敌人甩到崖下或小平台上
 function pushOut(o,r,en){const hit=en?(x,y)=>enemyBlock(x,y,r):(x,y)=>solidAt(x,y,r);if(!hit(o.x,o.y))return;
- for(let d=.2;d<3;d+=.18)for(let a=0;a<14;a++){const nx=o.x+Math.cos(a*Math.PI/7)*d,ny=o.y+Math.sin(a*Math.PI/7)*d;
-  if(nx>.4&&ny>.4&&nx<MAP_W-.4&&ny<MAP_H-.4&&!hit(nx,ny)){o.x=nx;o.y=ny;return}}}
+ const sameSide=!terrainBlock(o.x,o.y,0),cross=(x1,y1)=>{for(const s of SPOTS){if(s.t!=='wall')continue;const b=G&&G.b[s.id];if(!b||!b.lv||b.dead)continue;for(const g of segsOf(s)){
+   if(g.v){if((o.x-g.x)*(x1-g.x)<0){const t=(g.x-o.x)/(x1-o.x),yy=o.y+(y1-o.y)*t;if(Math.abs(yy-g.y)<=g.len/2)return true}}else if((o.y-g.y)*(y1-g.y)<0){const t=(g.y-o.y)/(y1-o.y),xx=o.x+(x1-o.x)*t;if(Math.abs(xx-g.x)<=g.len/2)return true}}}return false};
+ for(let pass=sameSide?0:1;pass<2;pass++)for(let d=.2;d<3;d+=.18)for(let a=0;a<14;a++){const nx=o.x+Math.cos(a*Math.PI/7)*d,ny=o.y+Math.sin(a*Math.PI/7)*d;
+  if(nx>.4&&ny>.4&&nx<MAP_W-.4&&ny<MAP_H-.4&&!hit(nx,ny)&&(pass||terrainLine(o.x,o.y,nx,ny,0)&&!cross(nx,ny))){o.x=nx;o.y=ny;return}}}
 // 寻路网格：有缺口就流向城堡，围死了就去打最近的墙
 const CELL=.5;let navW=0,navH=0,navBlock,navFriend,flowX,flowY,flowOk,navDirty=1,tFlowX,tFlowY,tFlowOk;
 function rebuildNav(){navDirty=0;navW=Math.ceil(MAP_W/CELL)+1;navH=Math.ceil(MAP_H/CELL)+1;const n=navW*navH;navBlock=new Uint8Array(n);navFriend=new Uint8Array(n);
@@ -240,7 +245,7 @@ function stepEnemy(e,dt){const E=ENEMIES[e.k];e.cd-=dt;e.flash=Math.max(0,(e.fla
   if(!e.tg){let bb=.45+(E.smash?.9:0);for(const s of SPOTS){const b=G.b[s.id];if(!b.lv||b.dead)continue;const d=bDist(s,e.x,e.y);if(d<bb){const q=bNear(s,e.x,e.y);if(!terrainLine(e.x,e.y,q.x,q.y,E.r*.6))continue;bb=d;e.tg={kind:'b',s}}}}}
  if(e.tg&&(e.tg.kind==='b'?G.b[e.tg.s.id].dead:e.tg.o.dead))e.tg=null;
  let tx,ty,tr,tg=e.tg;
- if(tg&&(tg.kind==='p'||tg.kind==='u')&&!lineClear(e.x,e.y,tg.o.x,tg.o.y,E.r*.55,1))tg=null;
+ if(tg&&(tg.kind==='p'||tg.kind==='u')&&(!lineClear(e.x,e.y,tg.o.x,tg.o.y,E.r*.55,1)||!terrainLine(e.x,e.y,tg.o.x,tg.o.y,0)))tg=null;
  if(tg&&(tg.kind==='p'||tg.kind==='u')){tx=tg.o.x;ty=tg.o.y;tr=.3}
  else if(tg&&tg.kind==='b'){const q=bNear(tg.s,e.x,e.y);tx=q.x;ty=q.y;tr=tg.s.t==='wall'?0:.75}
  else{const fl=flowAt(e.x,e.y);if(fl.ok){if(!fl.x&&!fl.y){tx=HOME.x;ty=HOME.y;tr=HOME.r;tg={kind:'home'}}else{tx=e.x+fl.x;ty=e.y+fl.y;tr=0;tg={kind:'home'}}}
@@ -266,13 +271,13 @@ function unitAnchor(u){const A=G.army,L=A.leader&&G.players[A.leader];
  if(A.mode!=='camp'){const n=G.units.length,i=G.units.indexOf(u),a=i/n*Math.PI*2+(A.mode==='follow'?Math.PI/2:0),r=n>5?1.5:1.2;return{x:A.x+Math.cos(a)*r,y:A.y+Math.sin(a)*r*.8}}
  const a=u.slot*2.4+(u.k==='duck'?1.2:0),s=spotOf(u.home);return{x:s.x+Math.cos(a)*1.1,y:s.y+.6+Math.sin(a)*.7}}
 // 小兵卡在塔/墙角之间（两个方向都走不动）：挪到旁边一个可走的寻路格中心，挑离目标最近的
-function unstickUnit(u,sp,goal){if(navDirty||!navFriend)rebuildNav();const ix=Math.round(u.x/CELL),iy=Math.round(u.y/CELL);let best=null,bd=1e9;
+function unstickUnit(u,sp,goal,force){if(navDirty||!navFriend)rebuildNav();const ix=Math.round(u.x/CELL),iy=Math.round(u.y/CELL);let best=null,bd=1e9;
  for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){const jx=ix+dx,jy=iy+dy;if(jx<0||jy<0||jx>=navW||jy>=navH||navFriend[jy*navW+jx])continue;const cx=jx*CELL,cy=jy*CELL,dd=Math.hypot(cx-u.x,cy-u.y);if(dd<.05)continue;
   const n=Math.ceil(dd/.1);let clear=true;for(let k=1;k<=n;k++)if(solidAt(u.x+(cx-u.x)*k/n,u.y+(cy-u.y)*k/n,.26)){clear=false;break}if(!clear)continue;const sc=dd+Math.hypot(cx-goal.x,cy-goal.y)*.5;if(sc<bd){bd=sc;best={x:cx,y:cy,d:dd}}}
  // 被塔和墙角围死在小缝里：允许像主角一样从塔身上钻出去
- if(!best){const hx=Math.round(u.x/CELL),hy=Math.round(u.y/CELL);for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const jx=hx+dx,jy=hy+dy;if(jx<0||jy<0||jx>=navW||jy>=navH||navFriend[jy*navW+jx])continue;const cx=jx*CELL,cy=jy*CELL,dd=Math.hypot(cx-u.x,cy-u.y);if(dd<.05)continue;
+ if(!best||force){const hx=Math.round(u.x/CELL),hy=Math.round(u.y/CELL);for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){const jx=hx+dx,jy=hy+dy;if(jx<0||jy<0||jx>=navW||jy>=navH||navFriend[jy*navW+jx])continue;const cx=jx*CELL,cy=jy*CELL,dd=Math.hypot(cx-u.x,cy-u.y);if(dd<.05)continue;
   const n=Math.ceil(dd/.1);let clear=true;for(let k=1;k<=n;k++)if(solidAt(u.x+(cx-u.x)*k/n,u.y+(cy-u.y)*k/n,.26,1)){clear=false;break}if(!clear)continue;const sc=dd+Math.hypot(cx-goal.x,cy-goal.y)*.5;if(sc<bd){bd=sc;best={x:cx,y:cy,d:dd,thru:1}}}}
- if(best&&best.thru){u.escape={x:best.x,y:best.y};return}
+ if(best&&(best.thru||force)){u.escape={x:best.x,y:best.y};return}
  if(best){const k=Math.min(sp,best.d)/best.d;u.x+=(best.x-u.x)*k;u.y+=(best.y-u.y)*k;u.path=null;u.pathT=0}}
 function stepUnit(u,dt){const U=UNITS[u.k],s=spotOf(u.home),b=G.b[s.id];u.flash=Math.max(0,(u.flash||0)-dt);
  if(u.dead){if(G.phase==='night'&&!b.dead){u.respawn-=dt;if(u.respawn<=0){u.dead=0;u.hp=u.max;u.x=s.x;u.y=s.y+.6;u.escape=null;u.path=null}}return}
@@ -289,6 +294,8 @@ function stepUnit(u,dt){const U=UNITS[u.k],s=spotOf(u.home),b=G.b[s.id];u.flash=
   if(u.path&&u.path.length){while(u.path.length>1&&Math.hypot(u.path[0].x-u.x,u.path[0].y-u.y)<.35)u.path.shift();const q=u.path[0],pd=Math.hypot(q.x-u.x,q.y-u.y);if(u.path.length===1&&pd<.2){u.moving=false;return}vx=(q.x-u.x)/(pd||.001);vy=(q.y-u.y)/(pd||.001)} }
  const nx=u.x+vx*sp,ny=u.y+vy*sp;if(!solidAt(nx,ny,.26)){u.x=nx;u.y=ny}else{const ux=u.x,uy=u.y,ox=u.x+vx*sp;if(!solidAt(ox,u.y,.26))u.x=ox;if(!solidAt(u.x,u.y+vy*sp,.26))u.y+=vy*sp;pushOut(u,.26);
   if(u.x===ux&&u.y===uy)unstickUnit(u,sp,goal)}
+ // 每秒看一次：想走却一秒内几乎没挪动（来回横跳），也当卡住处理
+ u.chkT=(u.chkT||0)+dt;if(u.chkT>=1){if(d>.6&&u.chkX!=null&&Math.hypot(u.x-u.chkX,u.y-u.chkY)<.2)unstickUnit(u,sp,goal,1);u.chkT=0;u.chkX=u.x;u.chkY=u.y}
  u.moving=true;u.ph+=dt*12;if(Math.abs(vx)>.05)u.dir=vx<0?2:3}
 // 被圆形建筑（塔/营地/菜园）挡住时，顺着边绕过去，不会卡住
 function slideAround(p,inp,sp){let best=null,bd=1.4;for(const s of SPOTS){const b=G.b[s.id];if(!b.lv||b.dead||s.t==='wall')continue;const d=Math.hypot(p.x-s.x,p.y-s.y);if(d<bd){bd=d;best=s}}
@@ -332,7 +339,9 @@ function step(dt){if(!G||G.phase==='win'||G.phase==='lose')return;G.t+=dt;G.dark
    const hp=E.hp*mul*(q.k==='boss'?(G.mods.bossHp||1):1)*(q.k==='bear'?(G.mods.bearHp||1):1);G.enemies.push({id:uid++,k:q.k,x:p.x,y:p.y,hp,max:hp,cd:0,rt:0,dir:2,ph:Math.random()*6,moving:true})}
   for(const e of G.enemies)if(!e.dead)stepEnemy(e,dt);for(const e of G.enemies)if(!e.dead)tickBurn(e,dt);
   // 互相挤开
-  const es=G.enemies;for(let i=0;i<es.length;i++)for(let k=i+1;k<es.length;k++){const a=es[i],b=es[k],rr=ENEMIES[a.k].r+ENEMIES[b.k].r,dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d>0&&d<rr){const o=(rr-d)/2*.5;a.x-=dx/d*o;a.y-=dy/d*o;b.x+=dx/d*o;b.y+=dy/d*o}}for(const e of es)if(!e.dead)pushOut(e,ENEMIES[e.k].r,1);
+  const es=G.enemies,sx0=es.map(e=>e.x),sy0=es.map(e=>e.y);for(let i=0;i<es.length;i++)for(let k=i+1;k<es.length;k++){const a=es[i],b=es[k],rr=ENEMIES[a.k].r+ENEMIES[b.k].r,dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d>0&&d<rr){const o=(rr-d)/2*.5;a.x-=dx/d*o;a.y-=dy/d*o;b.x+=dx/d*o;b.y+=dy/d*o}}
+  // 互相挤的时候不能被挤进悬崖/河里
+  for(let i=0;i<es.length;i++){const e=es[i];if(!e.dead&&terrainBlock(e.x,e.y,ENEMIES[e.k].r)&&!terrainBlock(sx0[i],sy0[i],ENEMIES[e.k].r)){e.x=sx0[i];e.y=sy0[i]}}for(const e of es)if(!e.dead)pushOut(e,ENEMIES[e.k].r,1);
   // 弹弓塔 + 城堡（连弩）
   for(const s of SPOTS){const b=G.b[s.id];if(s.t!=='tower'||!b.lv||b.dead)continue;b.cd-=dt;if(b.cd>0)continue;
    const snipe=hasPick(b,'snipe'),range=bStat(s,'range',b.lv)*(G.mods.trange||1)*(hasPick(b,'trange')?TOWER3.trange:1)*(snipe?TOWER3.snipeR:1),dmg=bStat(s,'dmg',b.lv)*(G.mods.tdmg||1)*(hasPick(b,'tdmg')?TOWER3.tdmg:1)*(snipe?TOWER3.snipeD:1);
