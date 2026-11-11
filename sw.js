@@ -1,6 +1,6 @@
 // 无用外交 离线缓存：安装时先存好核心文件；平时网络优先，断网时用缓存
 // 和同域名下的其他游戏共用 wudi0319.github.io，只清理自己前缀的旧缓存
-const P='wuyong-',C=P+'v2',V='?v=2';
+const P='wuyong-',C=P+'v3',V='?v=3';
 const CORE=['./','index.html','manifest.webmanifest','icon-192.png','icon-180.png','style.css'+V,
  ...['sfx','sprites','data','game','ui'].map(f=>'js/'+f+'.js'+V)];
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>Promise.all(CORE.map(u=>c.add(u).catch(()=>{})))))});

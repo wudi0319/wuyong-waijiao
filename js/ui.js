@@ -17,7 +17,6 @@ function renderStart(){const r=Game.loadRec();
  $('rec').textContent=(r.best||r.wins||tot)?`⭐ 累计 ${tot} 星 · 还可花 ${bag} · 通关 ${r.wins} 次 · 已过 ${nClear}/${MAP_ORDER.length} 关`:'';drawDogIcons()}
 function renderPrep(){const r=Game.loadRec(),sm=MAPS[sel.map];
  $('prepTitle').textContent='准备出发';
- $('prepMap').textContent=sm?(sm.ic+' '+sm.name+' · '+sm.desc):'';
  $('prepStars').textContent='⭐ 累计 '+starTotal(r)+' 星 · 还可花 '+starSpendable(r);
  sel.cat=sel.cat||'hero';
  $('prepTabs').innerHTML=Object.entries(CATS).map(([k,c])=>{
@@ -38,7 +37,8 @@ function renderPrep(){const r=Game.loadRec(),sm=MAPS[sel.map];
   return`<button data-d="${k}" class="${on?'on':''}">${d.ic} ${d.name}<small>+${d.star} 星 · ${d.desc}</small></button>`}).join(''):'<p class="cat-empty">这一类没有挑战</p>';
  const rg=starRange(sel.debuffs);
  const cat=CATS[sel.cat]?CATS[sel.cat].name:'';
- document.querySelector('.prep-k-buff').textContent=buffs.length?('带上'+cat+'加成（最多 '+BUFF_MAX+' 个，用星星兑换）'):(cat+'没有出发前加成');
+ const mix=Object.keys(CATS).filter(k=>Object.values(BUFFS).some(b=>(b.cat||'build')===k)).map(k=>CATS[k].name).join(' / ');
+ document.querySelector('.prep-k-buff').innerHTML='✨ 可以跨类混搭：'+mix+' 里一共选 '+BUFF_MAX+' 个 <em>已选 '+sel.buffs.length+'/'+BUFF_MAX+'</em>'+(buffs.length?'':'<small>'+cat+'这一类没有加成</small>');
  document.querySelector('.prep-k-deb').textContent=cat+'挑战（增加难度，通关星星更多）';
  $('prepForecast').textContent='本关通关可得 '+rg.min+'–'+rg.max+' 星'+(sel.debuffs.length?'（挑战 +'+debuffStars(sel.debuffs)+'）':'')+' · 已选加成 '+sel.buffs.length+'/'+BUFF_MAX;
  markScroll($('pickBuff'));markScroll($('pickDebuff'))}
@@ -103,7 +103,7 @@ function openBranch(s){const G=Game.G,c=Game.nextCost(s);if(c==null){toast(Game.
  if(!opts.length){if(Game.build(G.me,s.id))tut.on('build');return}
  branchSid=s.id;$('branchTitle').textContent=(lv===1?'建造 ':'升级 ')+Game.bName(s)+'（'+lv+' 级）';
  $('branchSub').textContent='花 '+c+' 金币，选一个路线';
- $('branchChoices').innerHTML=opts.map(o=>`<button data-b="${o.id}"><span class="ic">${o.ic}</span>${o.name}<small>${o.desc}</small></button>`).join('');
+ $('branchChoices').classList.toggle('three',opts.length===3);$('branchChoices').innerHTML=opts.map(o=>`<button data-b="${o.id}"><span class="ic">${o.ic}</span>${o.name}<small>${o.desc}</small></button>`).join('');
  $('branch').classList.remove('hidden');SFX.play('click')}
 $('branchChoices').onclick=e=>{const b=e.target.closest('button');if(!b||!branchSid)return;const p=me();if(p&&Game.build(p.id,branchSid,b.dataset.b)){closeBranch();tut.on('build')}};
 $('branchCancel').onclick=()=>{SFX.play('click');closeBranch()};

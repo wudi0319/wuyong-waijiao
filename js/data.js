@@ -251,14 +251,19 @@ function buffOwned(r,id,all){const b=BUFFS[id];if(!b)return false;if(all)return 
 function buffUnlocked(r,id,all){return condOk((BUFFS[id]||{}).unlock,r,all)}
 function debuffUnlocked(r,id,all){return condOk((DEBUFFS[id]||{}).unlock,r,all)}
 const ENEMY_STR=1.283; // 1.10×1.06×1.10：用户 2026-11-12 又要求整体再难 10%
+// 弹弓塔三选一的新路线数值（狙击 / 急速 / 灼烧）
+const TOWER3={bombR:1.9,bombMul:.8,volleyEach:.55,tdmg:1.4,trange:1.12,snipeD:2,snipeR:1.15,snipeCd:1.9,quickCd:.72,burnP:.75,burnT:2.5};
 const BRANCH={
   tower:{
-    1:[{id:'volley',ic:'💫',name:'连珠',desc:'连射 3 发，分打不同敌人，每发 55% 伤害'},
-       {id:'bomb',ic:'💣',name:'炸弹',desc:'弹丸落地爆炸，伤到周围的敌人'}],
-    2:[{id:'tdmg',ic:'🔥',name:'加伤',desc:'弹弓塔伤害 +25%'},
-       {id:'trange',ic:'🎯',name:'射程',desc:'弹弓塔射程 +20%'}],
+    1:[{id:'volley',ic:'💫',name:'连珠',desc:`连射 3 发，分打不同敌人，每发 ${Math.round(TOWER3.volleyEach*100)}% 伤害`},
+       {id:'bomb',ic:'💣',name:'炸弹',desc:'弹丸落地爆炸，伤到周围的敌人'},
+       {id:'snipe',ic:'🎯',name:'狙击',desc:`只打一个，伤害 ×${TOWER3.snipeD}，射程 +${Math.round(TOWER3.snipeR*100-100)}%，出手慢一些`}],
+    2:[{id:'tdmg',ic:'💥',name:'加伤',desc:`弹弓塔伤害 +${Math.round(TOWER3.tdmg*100-100)}%`},
+       {id:'trange',ic:'🔭',name:'射程',desc:`弹弓塔射程 +${Math.round(TOWER3.trange*100-100)}%`},
+       {id:'quickfire',ic:'⏩',name:'急速',desc:`出手快 ${Math.round(100/TOWER3.quickCd-100)}%`}],
     3:[{id:'slow',ic:'🐢',name:'减速',desc:'打中的敌人走得更慢'},
-       {id:'pierce',ic:'🗡️',name:'穿透',desc:'再穿过一个敌人；炸弹则炸得更开'}]
+       {id:'pierce',ic:'🗡️',name:'穿透',desc:'再穿过一个敌人；炸弹则炸得更开'},
+       {id:'burn',ic:'🔥',name:'灼烧',desc:`打中后着火，${TOWER3.burnT} 秒内再烧掉 ${Math.round(TOWER3.burnP*100)}% 伤害`}]
   },
   camp:{
     1:[{id:'horde',ic:'🪖',name:'人海',desc:'多 1 名士兵，倒下后更快复活'},
