@@ -13,13 +13,13 @@ function newGame(o){useMap(o.map||'yard');rebuildDecor();
  const mods=makeMods(buffs,debuffs,MAP.diff);
  G={phase:'day',night:0,gold:(MAP.gold||15)+(mods.start||0),t:0,nightT:0,spawnQ:[],buffs,debuffs,talents:buffs,mods,map:MAP.id,
   home:{hp:300*mods.stone,max:300*mods.stone,cd:0,hurtT:0,up:0,picks:[],bdmg:5,bcd:1.2,brange:3.8,regen:0,stipend:0,aura:1,beds:0,cozy:0,guard:0},
-  players:{},me:o.dog,b:{},enemies:[],units:[],shots:[],fx:[],floats:[],coins:[],
+  players:{},me:o.dog,b:{},enemies:[],units:[],shots:[],fx:[],floats:[],coins:[],snacks:[],
   input:{},army:{mode:'camp',leader:null,x:0,y:0},dark:0,shake:0,stats:{kills:0,broke:0,stars:0,starGain:0}};
  G.home.bpicks=[];for(const s of SPOTS)G.b[s.id]={lv:0,hp:0,max:0,cd:0,dead:0,picks:[]};
  view.mm.big=false;view.guide=null;addPlayer(o.dog,o.dog,o.weapon);navDirty=1;rebuildNav();cam.x=HOME.x;cam.y=HOME.y;return G}
 function addPlayer(id,dog,weapon){const max=100*G.mods.hp;let x=HOME.x,y=HOME.y+2.2;
  if(terrainBlock(x,y,.3)){for(let d=.2;d<5&&terrainBlock(x,y,.3);d+=.2)for(let a=0;a<16;a++){const nx=HOME.x+Math.cos(a*Math.PI/8)*d,ny=HOME.y+Math.sin(a*Math.PI/8)*d;if(nx>.5&&ny>.5&&nx<MAP_W-.5&&ny<MAP_H-.5&&!terrainBlock(nx,ny,.3)){x=nx;y=ny;break}}}
- G.players[id]={id,dog,weapon,x,y,dir:0,hp:max,max,cd:0,skillCd:0,dead:0,respawn:0,ph:0,moving:false,swing:0,face:{x:0,y:1}};G.input[id]={x:0,y:0}}
+ G.players[id]={id,dog,weapon,x,y,dir:0,hp:max,max,base:max,fat:0,feast:0,cd:0,skillCd:0,dead:0,respawn:0,ph:0,moving:false,swing:0,face:{x:0,y:1}};G.input[id]={x:0,y:0}}
 const spotOf=id=>SPOTS.find(s=>s.id===id);
 const bStat=(s,k,lv)=>BUILD[s.t][k][lv-1];
 function bMax(s,lv){let h=bStat(s,'hp',lv);const b=G.b[s.id];if(s.t==='wall'){h*=G.mods.stone;if(hasPick(b,'ironwall'))h*=1.3;if(hasPick(b,'reinforce'))h*=1.35;if(hasPick(b,'fort'))h*=1.4}else h*=(G.mods.bhp||1);return h}
@@ -85,9 +85,22 @@ function upgradeHome(pid,id,bottleId){if(G.phase!=='day')return false;const p=G.
 function autoHomeBottle(lv){const opts=branchOpts('home',lv);if(!opts.length)return null;
  const want=G.branchPlan&&G.branchPlan.home;const id=Array.isArray(want)?want[lv-1]:null;
  if(id&&opts.some(o=>o.id===id))return id;return opts[0].id}
-function startNight(){if(G.phase!=='day')return;G.phase='night';G.nightT=0;G.spawnQ=waveFor(G.night+1,G.mods.count);sfx('night');
+function hasPassive(p,id){const P=p&&DOGS[p.dog]&&DOGS[p.dog].passive;return !!P&&P.id===id}
+// 「肥胖/重装」：从第 2 夜起每夜开始时最大生命 +3% 基础值，当前生命一起加
+function applyFat(){for(const p of Object.values(G.players)){if(!hasPassive(p,'fat'))continue;const want=G.night;if((p.fat||0)>=want)continue;
+ const add=(p.base||100)*PASSIVE.fatPct*(want-(p.fat||0));p.fat=want;p.max+=add;p.hp=Math.min(p.max,p.hp+add);
+ const P=DOGS[p.dog].passive;hooks.toast(P.ic+' '+DOGS[p.dog].name+P.toast+'：生命上限 +'+Math.round(PASSIVE.fatPct*100)+'%（共 +'+Math.round(PASSIVE.fatPct*100*p.fat)+'%）');
+ if(G.floats.length<70)G.floats.push({x:p.x,y:p.y-1.6,txt:'❤️ +'+Math.round(add),t:0,col:'#ff8fa3',sm:1})}}
+function snackOn(){return Object.values(G.players).some(p=>hasPassive(p,'greedy'))}
+function dropSnack(e){if(!snackOn()||(G.snacks||(G.snacks=[])).length>=PASSIVE.snackMax)return;if(Math.random()>=(e.k==='boss'?PASSIVE.snackBoss:PASSIVE.snackP))return;
+ let x=e.x,y=e.y;if(terrainBlock(x,y,.2)||solidAt(x,y,.2,1)){const q={x,y};pushOut(q,.2);x=q.x;y=q.y}G.snacks.push({x,y,t:0,ph:Math.random()*6})}
+function stepSnacks(dt){if(!G.snacks||!G.snacks.length)return;for(const s of G.snacks){s.t+=dt;if(s.t>=PASSIVE.snackLife){s.gone=1;continue}
+  for(const p of Object.values(G.players)){if(p.dead||!hasPassive(p,'greedy'))continue;if(Math.hypot(p.x-s.x,p.y-s.y)<PASSIVE.pickR){s.gone=1;p.feast=PASSIVE.feastT;sfx('coin');
+   const P=DOGS[p.dog].passive;G.floats.push({x:p.x,y:p.y-1.5,txt:P.ic+' 攻速 +'+Math.round((PASSIVE.feastAs-1)*100)+'%',t:0,col:'#ffb347'});G.fx.push({k:'puff',x:s.x,y:s.y,t:0,life:.4});break}}}
+ G.snacks=G.snacks.filter(s=>!s.gone)}
+function startNight(){if(G.phase!=='day')return;G.phase='night';G.nightT=0;G.spawnQ=waveFor(G.night+1,G.mods.count);sfx('night');applyFat();
  hooks.toast('🌙 第 '+(G.night+1)+' 夜，敌人从'+nightDirs(G.night+1).map(d=>DIRS[d].cn).join('、')+'边来了！')}
-function morning(){G.night++;G.phase='day';G.coins=[];
+function morning(){G.night++;G.phase='day';G.coins=[];G.snacks=[];for(const p of Object.values(G.players))p.feast=0;
  if(G.night>=NIGHTS){G.phase='win';endGame(true);return}
  let pay=4+(G.home.stipend||0);for(const s of SPOTS){const b=G.b[s.id];if(s.t==='farm'&&b.lv&&!b.dead)pay+=bStat(s,'gold',b.lv)+(G.mods.farmPlus||0)+(hasPick(b,'harvest')?2:0)+(hasPick(b,'soil')?3:0)+(hasPick(b,'silo')?4:0)
   else if(G.mods.payroll&&(s.t==='tower'||s.t==='cats'||s.t==='ducks')&&b.lv&&!b.dead)pay+=G.mods.payroll}
@@ -119,7 +132,7 @@ function knockE(e,dx,dy){const r=ENEMIES[e.k].r,n=Math.max(1,Math.ceil(Math.hypo
 function hurtEnemy(e,d,stun,byP){if(e.dead)return;e.hp-=d;e.flash=.12;if(stun)e.stun=Math.max(e.stun||0,stun);
  if(byP===1){sfx('hit');const me=G.players[G.me];if(me)me.combat=G.t;if(G.floats.length<70)G.floats.push({x:e.x+(Math.random()-.5)*.4,y:e.y-ENEMIES[e.k].r*2-.3,txt:''+Math.round(d),t:.25,col:'#fff',sm:1})}
  if(byP==='u'&&G.mods.slow)e.slowT=Math.max(e.slowT||0,1.2);
- if(e.hp<=0){e.dead=1;let g=Math.round(ENEMIES[e.k].gold*G.mods.drop)+(G.mods.luck||0);if(G.mods.bounty&&(e.k==='bear'||e.k==='boss'))g+=Math.round(ENEMIES[e.k].gold*(G.mods.drop||1)*G.mods.bounty);g+=farmBountyGold(e);G.gold+=g;G.stats.kills++;sfx('kill');G.floats.push({x:e.x,y:e.y-.8,txt:'+'+g+'💰',t:0,col:'#ffd23f'});G.coins.push({x:e.x,y:e.y-.4,t:0,n:g});G.fx.push({k:'poof',x:e.x,y:e.y,t:0,life:.4,r:ENEMIES[e.k].r})}}
+ if(e.hp<=0){e.dead=1;dropSnack(e);let g=Math.round(ENEMIES[e.k].gold*G.mods.drop)+(G.mods.luck||0);if(G.mods.bounty&&(e.k==='bear'||e.k==='boss'))g+=Math.round(ENEMIES[e.k].gold*(G.mods.drop||1)*G.mods.bounty);g+=farmBountyGold(e);G.gold+=g;G.stats.kills++;sfx('kill');G.floats.push({x:e.x,y:e.y-.8,txt:'+'+g+'💰',t:0,col:'#ffd23f'});G.coins.push({x:e.x,y:e.y-.4,t:0,n:g});G.fx.push({k:'poof',x:e.x,y:e.y,t:0,life:.4,r:ENEMIES[e.k].r})}}
 function farmBountyGold(e){let n=0;for(const s of SPOTS){if(s.t!=='farm')continue;const b=G.b[s.id];if(!b||!b.lv||b.dead)continue;
   const add=(hasPick(b,'bounty')?1:0)+(hasPick(b,'scavenge')?1:0)+(hasPick(b,'fortune')?1:0);if(!add)continue;
   if(Math.hypot(e.x-s.x,e.y-s.y)<=(hasPick(b,'scavenge')?9:7))n+=add}return n}
@@ -143,7 +156,7 @@ function faceAng(p){if(p.face&&(Math.abs(p.face.x)+Math.abs(p.face.y))>1e-6)retu
 function inFan(p,e,range){const dx=e.x-p.x,dy=e.y-p.y,d=Math.hypot(dx,dy),er=(ENEMIES[e.k]&&ENEMIES[e.k].r)||.35;if(d>range+er)return false;if(d<.12)return true;
  let da=Math.atan2(dy,dx)-faceAng(p);while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;return Math.abs(da)<=Math.PI/2+1e-4}
 function playerAttack(p,dt){const W=WEAPONS[p.weapon];p.cd-=dt;p.skillCd=Math.max(0,p.skillCd-dt);if(p.cd>0)return;
- const range=W.range*(G.mods.prange||1),tg=nearestEnemy(p.x,p.y,range);if(!tg)return;p.cd=W.cd*(G.mods.pacd||1);p.swing=.3;p.combat=G.t;p.face={x:tg.x-p.x,y:tg.y-p.y};
+ const range=W.range*(G.mods.prange||1),tg=nearestEnemy(p.x,p.y,range);if(!tg)return;p.cd=W.cd*(G.mods.pacd||1)*((p.feast||0)>0?1/PASSIVE.feastAs:1);p.swing=.3;p.combat=G.t;p.face={x:tg.x-p.x,y:tg.y-p.y};
  if(W.kind==='melee'){const ang=Math.atan2(tg.y-p.y,tg.x-p.x);enemiesNear(p.x,p.y,range).forEach(e=>{if(!inFan(p,e,range))return;hurtEnemy(e,W.dmg*(G.mods.pdmg||1),0,1);const a=Math.atan2(e.y-p.y,e.x-p.x);knockE(e,Math.cos(a)*.15,Math.sin(a)*.15)});G.fx.push({k:'fan',x:p.x,y:p.y,a:ang,t:0,life:.3,r:range,w:p.weapon})}
  else if(W.kind==='ranged')shoot(p,tg,W.dmg*(G.mods.pdmg||1),'frisbee',11,1);
  else{enemiesNear(p.x,p.y,range).forEach(e=>hurtEnemy(e,W.dmg*(G.mods.pdmg||1),.3,1));G.shake=Math.max(G.shake,.12);G.fx.push({k:'slam',x:p.x,y:p.y,t:0,life:.35,r:range});G.fx.push({k:'arc',x:p.x,y:p.y,a:Math.atan2(tg.y-p.y,tg.x-p.x),t:0,life:.26,r:Math.min(range,1.8),w:p.weapon})}}
@@ -301,7 +314,7 @@ function stepUnit(u,dt){const U=UNITS[u.k],s=spotOf(u.home),b=G.b[s.id];u.flash=
 function slideAround(p,inp,sp){let best=null,bd=1.4;for(const s of SPOTS){const b=G.b[s.id];if(!b.lv||b.dead||s.t==='wall')continue;const d=Math.hypot(p.x-s.x,p.y-s.y);if(d<bd){bd=d;best=s}}
  if(!best)return;const rx=(p.x-best.x)/bd,ry=(p.y-best.y)/bd;let tx=-ry,ty=rx;if(tx*inp.x+ty*inp.y<0){tx=-tx;ty=-ty}
  const nx=clamp(p.x+tx*sp,.5,MAP_W-.5),ny=clamp(p.y+ty*sp,.5,MAP_H-.5);if(!solidAt(nx,ny,.3,1)){p.x=nx;p.y=ny}}
-function stepPlayer(p,dt){const inp=G.input[p.id]||{x:0,y:0};p.flash=Math.max(0,(p.flash||0)-dt);p.swing=Math.max(0,p.swing-dt);p.skillT=Math.max(0,(p.skillT||0)-dt);
+function stepPlayer(p,dt){const inp=G.input[p.id]||{x:0,y:0};p.flash=Math.max(0,(p.flash||0)-dt);p.feast=Math.max(0,(p.feast||0)-dt);p.swing=Math.max(0,p.swing-dt);p.skillT=Math.max(0,(p.skillT||0)-dt);
  if(p.dead){p.respawn-=dt;if(p.respawn<=0){p.dead=0;p.hp=p.max;p.x=HOME.x;p.y=HOME.y+2}return}
  p.healFx=Math.max(0,(p.healFx||0)-dt);
  if(G.phase==='night'&&p.hp<p.max&&(G.t-(p.combat||0))>=4){p.hp=Math.min(p.max,p.hp+4*(G.mods.pregen||1)*dt);p.healFx=.35;p.healAcc=(p.healAcc||0)+dt;if(p.healAcc>.4){p.healAcc=0;G.fx.push({k:'heal',x:p.x+(Math.random()-.5)*.3,y:p.y-.4,t:0,life:.55})}}
@@ -337,7 +350,7 @@ function step(dt){if(!G||G.phase==='win'||G.phase==='lose')return;G.t+=dt;G.dark
  if(G.phase==='night'){if(navDirty)rebuildNav();G.nightT+=dt;const n=G.night+1,mul=(1+.18*(n-1))*G.mods.ehp;
   while(G.spawnQ.length&&G.spawnQ[0].t<=G.nightT){const q=G.spawnQ.shift(),E=ENEMIES[q.k],p=spawnAt(q.dir);
    const hp=E.hp*mul*(q.k==='boss'?(G.mods.bossHp||1):1)*(q.k==='bear'?(G.mods.bearHp||1):1);G.enemies.push({id:uid++,k:q.k,x:p.x,y:p.y,hp,max:hp,cd:0,rt:0,dir:2,ph:Math.random()*6,moving:true})}
-  for(const e of G.enemies)if(!e.dead)stepEnemy(e,dt);for(const e of G.enemies)if(!e.dead)tickBurn(e,dt);
+  for(const e of G.enemies)if(!e.dead)stepEnemy(e,dt);for(const e of G.enemies)if(!e.dead)tickBurn(e,dt);stepSnacks(dt);
   // 互相挤开
   const es=G.enemies,sx0=es.map(e=>e.x),sy0=es.map(e=>e.y);for(let i=0;i<es.length;i++)for(let k=i+1;k<es.length;k++){const a=es[i],b=es[k],rr=ENEMIES[a.k].r+ENEMIES[b.k].r,dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d>0&&d<rr){const o=(rr-d)/2*.5;a.x-=dx/d*o;a.y-=dy/d*o;b.x+=dx/d*o;b.y+=dy/d*o}}
   // 互相挤的时候不能被挤进悬崖/河里
@@ -446,7 +459,19 @@ function heldW(c,w,sc){c.save();c.scale(sc,sc);
  c.restore()}
 function hPaw(c,kind,x,y){c.beginPath();c.ellipse(x,y,.06,.055,0,0,7);c.fillStyle=PAWC[kind]||'#ffdcbc';c.fill();hLine(c,.04)}
 function visDir(p){if(p.dir>=2)p.side=p.dir;const sk=(p.skillT||0)>0?1-p.skillT/.5:-1;if(sk>=0&&p.weapon==='spatula')return Math.floor(sk*10)%2?2:3;if(sk>=0&&p.weapon==='bone')return p.side||3;if(p.swing>0&&p.face){const f=p.face;if(Math.abs(f.x)>.05)p.side=f.x<0?2:3;return p.side||3}return p.dir}
-function drawPlayer(p){const size=1.3,dir=visDir(p),kind=p.dog,w=p.weapon,sc=1.12,
+// 零食：小饼干（胖宝）/ 烤肉腿（无用外交），最后 3 秒闪烁
+function drawSnack(s){const left=PASSIVE.snackLife-s.t;if(left<3&&Math.floor(s.t*8)%2)return;const X=sx(s.x),Y=sy(s.y)-T*(.2+Math.sin(G.t*4+s.ph)*.05),r=T*.25,c=ctx;
+ c.save();c.globalAlpha=.25;c.fillStyle='#000';c.beginPath();c.ellipse(X,sy(s.y),r*1.1,r*.4,0,0,7);c.fill();c.globalAlpha=.35+.2*Math.sin(G.t*6+s.ph);c.fillStyle='#fff3b0';c.beginPath();c.arc(X,Y,r*1.6,0,7);c.fill();c.globalAlpha=1;
+ c.lineWidth=Math.max(1.5,T*.035);c.strokeStyle='#5a3418';
+ if((DOGS.white.passive||{}).art==='meat'){c.translate(X,Y);c.rotate(-.6);c.fillStyle='#f3ead8';c.beginPath();c.rect(r*.35,-r*.14,r*.75,r*.28);c.fill();c.stroke();
+  for(const yy of[-1,1]){c.beginPath();c.arc(r*1.12,yy*r*.16,r*.16,0,7);c.fill();c.stroke()}
+  c.fillStyle='#b5562a';c.beginPath();c.ellipse(-r*.1,0,r*.62,r*.48,0,0,7);c.fill();c.stroke();c.fillStyle='#e38b4f';c.beginPath();c.ellipse(-r*.25,-r*.15,r*.25,r*.14,-.3,0,7);c.fill()}
+ else{c.fillStyle='#e0a458';c.beginPath();c.arc(X,Y,r,0,7);c.fill();c.stroke();c.fillStyle='#f2c27b';c.beginPath();c.arc(X-r*.25,Y-r*.25,r*.35,0,7);c.fill();
+  c.fillStyle='#5a3418';for(const [a,b2] of [[-.35,.1],[.3,-.3],[.25,.35],[-.05,-.45],[-.4,-.35]]){c.beginPath();c.arc(X+a*r,Y+b2*r,r*.11,0,7);c.fill()}}
+ c.restore()}
+function drawFeastGlow(p){const k=Math.min(1,p.feast/1),a=(.6+.25*Math.sin(G.t*10))*k;ctx.save();ctx.globalAlpha=a;ctx.strokeStyle='#ffb347';ctx.lineWidth=Math.max(3,T*.1);ctx.beginPath();ctx.ellipse(sx(p.x),sy(p.y)-T*.05,T*.7,T*.34,0,0,7);ctx.stroke();
+ ctx.fillStyle='#ffd27a';ctx.globalAlpha=a*.5;ctx.beginPath();ctx.ellipse(sx(p.x),sy(p.y)-T*.05,T*.7,T*.34,0,0,7);ctx.fill();ctx.restore()}
+function drawPlayer(p){const size=1.3*(1+.01*(p.fat||0)),dir=visDir(p),kind=p.dog,w=p.weapon,sc=1.12,
   sk=(p.skillT||0)>0?1-p.skillT/.5:-1,k=p.swing>0?1-p.swing/.3:-1,bob=p.moving?Math.sin(p.ph)*.015:0,
   frHide=w==='frisbee'&&p.cd>WEAPONS.frisbee.cd-.35&&G.phase==='night';
  ctx.save();if(p.flash)ctx.globalAlpha=.6;ctx.translate(sx(p.x)-size*T/2,sy(p.y)-size*T*.95);ctx.scale(size*T,size*T);const c=ctx;
@@ -654,7 +679,8 @@ function render(){const W=VW,H=VH;ctx.setTransform(DPR,0,0,DPR,0,0);const me=G&&
  for(const d of DECOR)if(d.x>vx0&&d.x<vx1&&d.y>vy0&&d.y<vy1)L.push({y:d.y,f:()=>cachedSpr(d.k,d.x,d.y+.4,d.k==='tree'?1.5:.8)});
  for(const s of SPOTS){const b=G.b[s.id];if(b.lv){const yy=s.t==='wall'?Math.max(...segsOf(s).map(g=>g.y+(g.v?g.len/2:0))):s.y;L.push({y:yy,f:()=>{drawBuilding(s,b);if(ns===s){ctx.save();ctx.strokeStyle='#ff8c42';ctx.lineWidth=3;ctx.setLineDash([5,4]);ctx.beginPath();ctx.ellipse(sx(s.x),sy(s.y)+T*.2,T*.95,T*.4,0,0,7);ctx.stroke();ctx.restore()}}})}}
  L.push({y:HOME.y+.6,f:()=>{spr(S.castle,HOME.x,HOME.y+.8,3.4+(G.home.up||0)*.08,G.home.up||0);drawCastleBow()}});
- for(const p of Object.values(G.players))if(!p.dead)L.push({y:p.y,f:()=>{if(p.healFx>0){ctx.save();ctx.globalAlpha=.45*p.healFx/.35;ctx.fillStyle='#9eeb7a';ctx.beginPath();ctx.ellipse(sx(p.x),sy(p.y)-T*.2,T*.7,T*.35,0,0,7);ctx.fill();ctx.restore()}drawPlayer(p)}});
+ for(const p of Object.values(G.players))if(!p.dead)L.push({y:p.y,f:()=>{if((p.feast||0)>0)drawFeastGlow(p);if(p.healFx>0){ctx.save();ctx.globalAlpha=.45*p.healFx/.35;ctx.fillStyle='#9eeb7a';ctx.beginPath();ctx.ellipse(sx(p.x),sy(p.y)-T*.2,T*.7,T*.35,0,0,7);ctx.fill();ctx.restore()}drawPlayer(p)}});
+ for(const s of (G.snacks||[]))L.push({y:s.y-.3,f:()=>drawSnack(s)});
  for(const u of G.units)if(!u.dead)L.push({y:u.y,f:()=>{const ap=u.atkAt!=null?(G.t-u.atkAt)/.32:2;spr(critter,u.x,u.y,.75,u.k,u.dir,u.ph,u.moving&&!(ap<1),u.flash>0,ap<1?{p:ap}:null)}});
  for(const e of G.enemies)L.push({y:e.y,f:()=>{const atk=e.wind>0?{ph:'wind',p:1-e.wind/(e.windMax||.2)}:e.atk>0?{ph:'hit',p:1-e.atk/(e.atkMax||.22)}:null;
   const lu=(e.atk>0?Math.sin((1-e.atk/(e.atkMax||.22))*Math.PI)*.28:0),ax=Math.cos(e.atkA||0)*lu,ay=Math.sin(e.atkA||0)*lu;
@@ -687,10 +713,10 @@ function render(){const W=VW,H=VH;ctx.setTransform(DPR,0,0,DPR,0,0);const me=G&&
  if(G.home.hp<G.home.max)bar(HOME.x,HOME.y-3.05,2,G.home.hp/G.home.max);
  for(const e of G.enemies)if(e.hp<e.max)bar(e.x,e.y-ENEMIES[e.k].r*2.4-.15,ENEMIES[e.k].r*1.6,e.hp/e.max,'#ff5a5a');
  for(const u of G.units)if(!u.dead&&u.hp<u.max)bar(u.x,u.y-.85,.6,u.hp/u.max);
- for(const p of Object.values(G.players))if(!p.dead){ctx.font=`900 ${T*.3}px sans-serif`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='#fff';ctx.fillStyle='#7a4b1d';ctx.strokeText(DOGS[p.dog].name,sx(p.x),sy(p.y-1.45));ctx.fillText(DOGS[p.dog].name,sx(p.x),sy(p.y-1.45));if(p.hp<p.max)bar(p.x,p.y-1.35,.9,p.hp/p.max)}
+ for(const p of Object.values(G.players))if(!p.dead){ctx.font=`900 ${T*.3}px sans-serif`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='#fff';ctx.fillStyle='#7a4b1d';ctx.strokeText(DOGS[p.dog].name,sx(p.x),sy(p.y-1.45));ctx.fillText(DOGS[p.dog].name,sx(p.x),sy(p.y-1.45));if((p.feast||0)>0){const P=DOGS[p.dog].passive,nw=ctx.measureText(DOGS[p.dog].name).width;ctx.font=`${T*.3}px sans-serif`;ctx.fillText(P.ic,sx(p.x)+nw/2+T*.22,sy(p.y-1.45))}if(p.hp<p.max)bar(p.x,p.y-1.35,.9,p.hp/p.max)}
  if(G.phase==='day')for(const d of nightDirs(G.night+1))drawWarn(d);
  if(view.guide&&G.phase==='day'){const s=spotOf(view.guide);if(s){const X=sx(s.x),Y=sy(s.y)-T*(1.3+.2*Math.sin(performance.now()/180));ctx.save();ctx.fillStyle='#ff8c42';ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(X,Y+T*.45);ctx.lineTo(X-T*.35,Y);ctx.lineTo(X-T*.14,Y);ctx.lineTo(X-T*.14,Y-T*.4);ctx.lineTo(X+T*.14,Y-T*.4);ctx.lineTo(X+T*.14,Y);ctx.lineTo(X+T*.35,Y);ctx.closePath();ctx.stroke();ctx.fill();ctx.restore()}}
  for(const c of G.coins){const k=Math.min(1,c.t/.7),e=k*k,X0=sx(c.x),Y0=sy(c.y),X=X0+(view.gold.x-X0)*e,Y=Y0+(view.gold.y-Y0)*e-Math.sin(k*Math.PI)*T*1.2;ctx.save();ctx.fillStyle='#ffd23f';ctx.strokeStyle='#b8860b';ctx.lineWidth=2;ctx.beginPath();ctx.arc(X,Y,T*.16,0,7);ctx.fill();ctx.stroke();ctx.restore()}
  for(const f of G.floats){ctx.save();ctx.globalAlpha=1-f.t/1.1;ctx.font=`900 ${T*(f.sm?.3:.4)}px sans-serif`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='#6b4a32';ctx.fillStyle=f.col;ctx.strokeText(f.txt,sx(f.x),sy(f.y-f.t*.8));ctx.fillText(f.txt,sx(f.x),sy(f.y-f.t*.8));ctx.restore()}
  if(G.phase==='night')drawOffscreen(W,H);drawMinimap(W,H)}
-window.Game={screenOf:o=>({x:sx(o.x),y:sy(o.y),T}),newGame,step,render,build,startNight,skill,toggleArmy,armyFollow,armyDeploy,nearSpot,nextCost,hooks,loadRec,saveRec,get G(){return G},resize,critter,addPlayer,view,spotOf,useMap,flowAt,lineClear,pushOut,rebuildNav,bName,bDist,solidAt,enemySolid,enemyBlock,terrainBlock,spawnAt,astar,nearHome,homeUpCost,homeUpChoices,upgradeHome,applyHomeUp,rateStars,makeMods,buyBuff,upgradeHint,unitRespawn,panbaoPawWorld,panbaoPose,THROW_MAX,THROW_RELEASE,BOTTLE_FLY,inFan,faceAng,demolish,demolishValue,branchKind,branchOpts,branchById,hasPick,pickIcons,autoBranch};
+window.Game={hasPassive,applyFat,stepSnacks,dropSnack,screenOf:o=>({x:sx(o.x),y:sy(o.y),T}),newGame,step,render,build,startNight,skill,toggleArmy,armyFollow,armyDeploy,nearSpot,nextCost,hooks,loadRec,saveRec,get G(){return G},resize,critter,addPlayer,view,spotOf,useMap,flowAt,lineClear,pushOut,rebuildNav,bName,bDist,solidAt,enemySolid,enemyBlock,terrainBlock,spawnAt,astar,nearHome,homeUpCost,homeUpChoices,upgradeHome,applyHomeUp,rateStars,makeMods,buyBuff,upgradeHint,unitRespawn,panbaoPawWorld,panbaoPose,THROW_MAX,THROW_RELEASE,BOTTLE_FLY,inFan,faceAng,demolish,demolishValue,branchKind,branchOpts,branchById,hasPick,pickIcons,autoBranch};

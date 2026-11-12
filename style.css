@@ -198,3 +198,8 @@ body.on-modal #joy,body.on-modal #acts{visibility:hidden;pointer-events:none}
 #prep .card>.prep-k-buff em{font-style:normal;display:inline-block;background:#fff;color:#e8611f;border-radius:999px;padding:0 8px;margin-left:4px;font-size:12px;text-shadow:none;white-space:nowrap}
 #prep .card>.prep-k-buff small{display:block;font-size:11px;font-weight:700;opacity:.9}
 @media (orientation:landscape) and (max-height:500px){#prep .card>.prep-k-buff{font-size:11px;padding:3px 8px;border-radius:10px;line-height:1.3}#prep .card>.prep-k-buff em{font-size:10.5px}#prep .card>.prep-k-buff small{font-size:9.5px}}
+
+/* 角色天生被动 */
+.dog-passive,.prep-passive{margin:6px auto 2px;padding:6px 10px;max-width:420px;border-radius:12px;background:linear-gradient(90deg,#fff4d6,#ffe6c7);border:2px dashed #f0a35e;color:#6b3f1d;font-size:13px;line-height:1.35;text-align:left}
+.dog-passive b,.prep-passive b{display:block;font-size:14px;color:#c0561b}
+.dog-passive span,.prep-passive span{display:block}

@@ -13,9 +13,11 @@ function renderStart(){const r=Game.loadRec();
   return`<button data-map="${m.id}" class="${sel.map===m.id?'on':''} ${ok?'':'lock'} ${cleared?'cleared':''}">${m.ic} ${m.name}<small class="stars">${mark}</small></button>`}).join('');
  const sm=MAPS[sel.map];$('mapDesc').textContent=sm?(sm.ic+' '+sm.desc):'';
  document.querySelectorAll('#pickDog button').forEach(b=>b.classList.toggle('on',b.dataset.dog===sel.dog));
+ $('dogPassive').innerHTML=passiveHtml(sel.dog);
  const nClear=MAP_ORDER.filter(id=>mapCleared(r,id)).length,tot=starTotal(r),bag=starSpendable(r);
  $('rec').textContent=(r.best||r.wins||tot)?`⭐ 累计 ${tot} 星 · 还可花 ${bag} · 通关 ${r.wins} 次 · 已过 ${nClear}/${MAP_ORDER.length} 关`:'';drawDogIcons()}
-function renderPrep(){const r=Game.loadRec(),sm=MAPS[sel.map];
+function passiveHtml(dog){const D=DOGS[dog],P=D&&D.passive;return P?`<b>${P.ic} ${D.name}天生被动「${P.name}」</b><span>${P.desc}</span>`:''}
+function renderPrep(){const r=Game.loadRec(),sm=MAPS[sel.map];$('prepPassive').innerHTML=passiveHtml(sel.dog);
  $('prepTitle').textContent='准备出发';
  $('prepStars').textContent='⭐ 累计 '+starTotal(r)+' 星 · 还可花 '+starSpendable(r);
  sel.cat=sel.cat||'hero';

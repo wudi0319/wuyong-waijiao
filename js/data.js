@@ -1,5 +1,8 @@
 // 无用外交 — 游戏数据（武器 / 天赋 / 建筑 / 敌人 / 地图 / 每晚的敌人）
-const DOGS={yellow:{name:'红王',ic:'🤴'},white:{name:'蓝王',ic:'👑'}};
+// 角色天生被动（不用星星）：fat=每夜加生命上限，greedy=敌人掉零食、吃了加攻速
+const PASSIVE={fatPct:.03,snackP:.15,snackBoss:1,snackLife:10,snackMax:10,feastT:5,feastAs:1.2,pickR:.8};
+const DOGS={yellow:{name:'红王',ic:'🤴',passive:{id:'fat',name:'重装',ic:'🛡️',desc:'每守过一夜铠甲加厚一层：最大生命 +3%（第 7 夜约 +18%）',toast:'铠甲又加厚了'}},
+ white:{name:'蓝王',ic:'👑',passive:{id:'greedy',name:'嗜血',ic:'🍗',desc:'打倒敌人有机会掉烤肉腿，走过去吃掉：攻速 +20%，持续 5 秒',snack:'烤肉腿',art:'meat'}}};
 const WEAPONS={
  spatula:{name:'长剑',ic:'🗡️',desc:'近战，前方 180° 扇面挥剑，扇内每个敌人都受伤',kind:'melee',range:1.5,dmg:16,cd:.45,
   skill:{name:'旋风斩',cd:9,desc:'转圈劈飞身边所有敌人'}},
