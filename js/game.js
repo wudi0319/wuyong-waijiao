@@ -353,7 +353,7 @@ function step(dt){if(!G||G.phase==='win'||G.phase==='lose')return;G.t+=dt;G.dark
  for(const p of Object.values(G.players))stepPlayer(p,dt);
  if(G.phase==='night'){if(navDirty)rebuildNav();G.nightT+=dt;const n=G.night+1,mul=(1+.18*(n-1))*G.mods.ehp;
   while(G.spawnQ.length&&G.spawnQ[0].t<=G.nightT){const q=G.spawnQ.shift(),E=ENEMIES[q.k],p=spawnAt(q.dir);
-   const hp=E.hp*mul*(q.k==='boss'?(G.mods.bossHp||1):1)*(q.k==='bear'?(G.mods.bearHp||1):1);G.enemies.push({id:uid++,k:q.k,x:p.x,y:p.y,hp,max:hp,cd:0,rt:0,dir:2,ph:Math.random()*6,moving:true})}
+   const hp=E.hp*mul*(q.k==='boss'?(G.mods.bossHp||1):1)*(q.k==='bear'?(G.mods.bearHp||1):1)*(q.k==='boar'?1+BOAR_NIGHT_HP*Math.max(0,n-BOAR_FROM):1);if(q.k==='boar')hooks.toast('🐗 '+E.name+'来了！血很厚，集中火力！');G.enemies.push({id:uid++,k:q.k,x:p.x,y:p.y,hp,max:hp,cd:0,rt:0,dir:2,ph:Math.random()*6,moving:true})}
   for(const e of G.enemies)if(!e.dead)stepEnemy(e,dt);for(const e of G.enemies)if(!e.dead)tickBurn(e,dt);stepSnacks(dt);
   // 互相挤开
   const es=G.enemies,sx0=es.map(e=>e.x),sy0=es.map(e=>e.y);for(let i=0;i<es.length;i++)for(let k=i+1;k<es.length;k++){const a=es[i],b=es[k],rr=ENEMIES[a.k].r+ENEMIES[b.k].r,dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d>0&&d<rr){const o=(rr-d)/2*.5;a.x-=dx/d*o;a.y-=dy/d*o;b.x+=dx/d*o;b.y+=dy/d*o}}
@@ -413,27 +413,29 @@ function rebuildDecor(){DECOR.length=0;seed=7;const t=MAP&&MAP.terrain,lim=(t&&t
 rebuildDecor();
 // ---- 士兵画法（单位格 0..1，脚在 .95） ----
 function critter(c,k,dir,ph,mv,flash,atk){if(k==='kitten'||k==='duck')return S.soldier(c,k,dir,ph,mv,flash,atk);const f=dir===2?-1:1,b=mv?Math.abs(Math.sin(ph))*.05:0,K='#3b2a20';c.save();c.translate(.5,0);c.scale(f,1);c.translate(-.5,0);
- let lean=0,squ=1,rise=0;if(atk){if(atk.ph==='wind'){lean=-.14*atk.p;rise=.05*atk.p;squ=(k==='boss'||k==='bear')?1-.14*atk.p:1-.04*atk.p}else{const q=Math.sin(Math.min(1,atk.p*1.5)*Math.PI);lean=.2*q;squ=1+.12*q;if(k==='boss')squ=1+.22*q;rise=-.06*q}}
+ let lean=0,squ=1,rise=0;if(atk){if(atk.ph==='wind'){lean=-.14*atk.p;rise=.05*atk.p;squ=(k==='boss'||k==='bear'||k==='boar')?1-.14*atk.p:1-.04*atk.p}else{const q=Math.sin(Math.min(1,atk.p*1.5)*Math.PI);lean=.2*q;squ=1+.12*q;if(k==='boss')squ=1+.22*q;rise=-.06*q}}
  c.save();c.translate(.5,.72);c.rotate(lean);c.scale(1+Math.max(0,1-squ)*.15,squ);c.translate(-.5,-.72-rise);
- const C={raccoon:['#9aa0a8','#6b7078','#f4f1ea'],wolf:['#7d8796','#5a6372','#d9dde3'],bear:['#a8774e','#7d5434','#e8c9a0'],boss:['#8f5e38','#6b4226','#e8c9a0'],kitten:['#ffb86b','#f08a3a','#fff3e0'],duck:['#ffe066','#f2c230','#fff8d0']}[k];
+ const C={raccoon:['#9aa0a8','#6b7078','#f4f1ea'],wolf:['#7d8796','#5a6372','#d9dde3'],bear:['#a8774e','#7d5434','#e8c9a0'],boss:['#8f5e38','#6b4226','#e8c9a0'],boar:['#8a6248','#5a3d2c','#f2b8a8'],kitten:['#ffb86b','#f08a3a','#fff3e0'],duck:['#ffe066','#f2c230','#fff8d0']}[k];
  const [body,dark,light]=flash?['#fff','#fff','#fff']:C;
  const E=(x,y,rx,ry,col,w=.05,rot=0)=>{c.beginPath();c.ellipse(x,y,rx,ry,rot,0,7);c.fillStyle=col;c.fill();if(w){c.lineWidth=w;c.strokeStyle=K;c.stroke()}};
  c.beginPath();c.ellipse(.5,.93,.3,.06,0,0,7);c.fillStyle='rgba(60,40,20,.25)';c.fill();
  if(k==='duck'){E(.5,.7-b,.26,.22,body);E(.36,.68-b,.1,.07,dark,.04,.4);E(.62,.44-b,.17,.16,body);E(.8,.47-b,.08,.04,'#ff9a3a',.04);E(.66,.41-b,.022,.022,K,0);E(.43,.92,.05,.03,'#ff9a3a',.03);E(.57,.92,.05,.03,'#ff9a3a',.03);c.restore();c.restore();return}
  // 尾巴
  if(k==='raccoon'){for(let i=0;i<3;i++)E(.18-i*.06,.62-i*.05-b,.08,.06,i%2?K:body,.04,.5)}else if(k==='kitten'){c.beginPath();c.moveTo(.26,.7);c.quadraticCurveTo(.08,.6,.16,.42);c.lineWidth=.07;c.strokeStyle=K;c.lineCap='round';c.stroke();c.lineWidth=.04;c.strokeStyle=body;c.stroke()}else if(k==='wolf')E(.2,.6-b,.13,.06,dark,.04,-.5);
+ else if(k==='boar'){c.beginPath();c.moveTo(.22,.64-b);c.quadraticCurveTo(.1,.6-b,.14,.52-b);c.quadraticCurveTo(.18,.47-b,.16,.55-b);c.lineWidth=.035;c.strokeStyle=K;c.lineCap='round';c.stroke()}
  // 腿 + 身体
  const lg=mv?Math.sin(ph)*.04:0;[.34,.62].forEach((x,i)=>E(x+(i?lg:-lg),.88,.06,.05,dark,.04));
- E(.48,.7-b,.27,.2,body);
- const hx=.62,hy=.42-b,hr=k==='bear'||k==='boss'?.2:.18;
+ if(k==='boar'){E(.47,.68-b,.31,.23,body);c.beginPath();for(let i=0;i<6;i++){const x=.24+i*.07,y=.47-b-Math.sin(i/5*Math.PI)*.03;c.moveTo(x-.03,y+.04);c.lineTo(x+.01,y-.07);c.lineTo(x+.04,y+.04)}c.fillStyle=dark;c.fill();c.lineWidth=.03;c.strokeStyle=K;c.stroke()}else E(.48,.7-b,.27,.2,body);
+ const hx=.62,hy=.42-b,hr=k==='bear'||k==='boss'||k==='boar'?.2:.18;
  // 耳朵
- if(k==='wolf'||k==='kitten'){[[-.11,0],[.1,0]].forEach(([o])=>{c.beginPath();c.moveTo(hx+o-.06,hy-.1);c.lineTo(hx+o,hy-.27);c.lineTo(hx+o+.06,hy-.1);c.closePath();c.fillStyle=body;c.fill();c.lineWidth=.045;c.strokeStyle=K;c.stroke()})}
+ if(k==='boar'){[[-.12,-.35],[.1,.35]].forEach(([o,r])=>{c.beginPath();c.moveTo(hx+o-.06,hy-.1);c.lineTo(hx+o+r*.12,hy-.24);c.lineTo(hx+o+.06,hy-.1);c.closePath();c.fillStyle=dark;c.fill();c.lineWidth=.04;c.strokeStyle=K;c.stroke()})}
+ else if(k==='wolf'||k==='kitten'){[[-.11,0],[.1,0]].forEach(([o])=>{c.beginPath();c.moveTo(hx+o-.06,hy-.1);c.lineTo(hx+o,hy-.27);c.lineTo(hx+o+.06,hy-.1);c.closePath();c.fillStyle=body;c.fill();c.lineWidth=.045;c.strokeStyle=K;c.stroke()})}
  else{E(hx-.13,hy-.13,.06,.06,dark,.04);E(hx+.12,hy-.14,.06,.06,dark,.04)}
  E(hx,hy,hr,hr*.92,body);
  if(k==='raccoon')E(hx+.03,hy-.01,.15,.055,K,0);
- E(hx+.08,hy+.07,.09,.06,light,.03);E(hx+.14,hy+.05,.025,.02,K,0);
+ if(k==='boar'){E(hx+.15,hy+.06,.085,.07,light,.035);E(hx+.13,hy+.06,.016,.022,K,0);E(hx+.18,hy+.06,.016,.022,K,0);[[.05,.13],[.2,.14]].forEach(([dx,dy])=>{c.beginPath();c.moveTo(hx+dx,hy+dy-.02);c.quadraticCurveTo(hx+dx+.05,hy+dy+.02,hx+dx+.03,hy+dy-.08);c.lineWidth=.035;c.strokeStyle='#fffbea';c.lineCap='round';c.stroke()})}else{E(hx+.08,hy+.07,.09,.06,light,.03);E(hx+.14,hy+.05,.025,.02,K,0);}
  const ey=k==='raccoon'?'#fff':K;E(hx-.03,hy-.02,.022,.026,ey,0);E(hx+.09,hy-.02,.022,.026,ey,0);
- if(k==='wolf'||k==='boss'){c.beginPath();c.moveTo(hx-.07,hy-.08);c.lineTo(hx+.01,hy-.05);c.moveTo(hx+.14,hy-.08);c.lineTo(hx+.07,hy-.05);c.lineWidth=.03;c.strokeStyle=K;c.stroke()}
+ if(k==='wolf'||k==='boss'||k==='boar'){c.beginPath();c.moveTo(hx-.07,hy-.08);c.lineTo(hx+.01,hy-.05);c.moveTo(hx+.14,hy-.08);c.lineTo(hx+.07,hy-.05);c.lineWidth=.03;c.strokeStyle=K;c.stroke()}
  if(k==='kitten'){c.beginPath();c.moveTo(hx+.18,hy+.05);c.lineTo(hx+.3,hy+.02);c.moveTo(hx+.18,hy+.08);c.lineTo(hx+.3,hy+.1);c.lineWidth=.018;c.strokeStyle=K;c.stroke();E(hx-.06,hy+.06,.03,.02,'#ff9eae',0)}
  if(k==='boss'){c.beginPath();c.moveTo(hx-.12,hy-.16);c.lineTo(hx-.1,hy-.32);c.lineTo(hx-.03,hy-.22);c.lineTo(hx+.02,hy-.34);c.lineTo(hx+.07,hy-.22);c.lineTo(hx+.13,hy-.32);c.lineTo(hx+.13,hy-.16);c.closePath();c.fillStyle='#ffd23f';c.fill();c.lineWidth=.03;c.strokeStyle=K;c.stroke()}
  // 攻击动作：举手/挥爪/石头，让出手看得清楚
@@ -715,7 +717,8 @@ function render(){const W=VW,H=VH;ctx.setTransform(DPR,0,0,DPR,0,0);const me=G&&
  // 血条 / 飘字 / 警告（在夜色上面）
  for(const s of SPOTS){const b=G.b[s.id];if(b.lv&&!b.dead&&b.hp<b.max)bar(s.x,s.y-(s.t==='tower'?2.4:s.t==='wall'?1.2:1.7),1.2,b.hp/b.max)}
  if(G.home.hp<G.home.max)bar(HOME.x,HOME.y-3.05,2,G.home.hp/G.home.max);
- for(const e of G.enemies)if(e.hp<e.max)bar(e.x,e.y-ENEMIES[e.k].r*2.4-.15,ENEMIES[e.k].r*1.6,e.hp/e.max,'#ff5a5a');
+ for(const e of G.enemies)if(e.hp<e.max||ENEMIES[e.k].mini)bar(e.x,e.y-ENEMIES[e.k].r*2.4-.15,ENEMIES[e.k].r*1.6,e.hp/e.max,'#ff5a5a');
+ for(const e of G.enemies)if(!e.dead&&ENEMIES[e.k].mini){const X=sx(e.x),Y=sy(e.y-ENEMIES[e.k].r*2.4-.15)-8;ctx.save();ctx.font='bold '+Math.max(10,Math.round(T*.36))+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.lineWidth=3;ctx.strokeStyle='rgba(59,42,32,.85)';ctx.strokeText(ENEMIES[e.k].name,X,Y);ctx.fillStyle='#ffd8a8';ctx.fillText(ENEMIES[e.k].name,X,Y);ctx.restore()}
  for(const u of G.units)if(!u.dead&&u.hp<u.max)bar(u.x,u.y-.85,.6,u.hp/u.max);
  for(const p of Object.values(G.players))if(!p.dead){ctx.font=`900 ${T*.3}px sans-serif`;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle='#fff';ctx.fillStyle='#7a4b1d';ctx.strokeText(DOGS[p.dog].name,sx(p.x),sy(p.y-1.45));ctx.fillText(DOGS[p.dog].name,sx(p.x),sy(p.y-1.45));if((p.feast||0)>0){const P=DOGS[p.dog].passive,nw=ctx.measureText(DOGS[p.dog].name).width;ctx.font=`${T*.3}px sans-serif`;ctx.fillText(P.ic,sx(p.x)+nw/2+T*.22,sy(p.y-1.45))}if(p.hp<p.max)bar(p.x,p.y-1.35,.9,p.hp/p.max)}
  if(G.phase==='day')for(const d of nightDirs(G.night+1))drawWarn(d);
