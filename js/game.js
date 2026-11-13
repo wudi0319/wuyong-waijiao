@@ -353,7 +353,7 @@ function step(dt){if(!G||G.phase==='win'||G.phase==='lose')return;G.t+=dt;G.dark
  for(const p of Object.values(G.players))stepPlayer(p,dt);
  if(G.phase==='night'){if(navDirty)rebuildNav();G.nightT+=dt;const n=G.night+1,mul=(1+.18*(n-1))*G.mods.ehp;
   while(G.spawnQ.length&&G.spawnQ[0].t<=G.nightT){const q=G.spawnQ.shift(),E=ENEMIES[q.k],p=spawnAt(q.dir);
-   const hp=E.hp*mul*(q.k==='boss'?(G.mods.bossHp||1):1)*(q.k==='bear'?(G.mods.bearHp||1):1)*(q.k==='boar'?1+BOAR_NIGHT_HP*Math.max(0,n-BOAR_FROM):1);if(q.k==='boar')hooks.toast('🐗 '+E.name+'来了！血很厚，集中火力！');G.enemies.push({id:uid++,k:q.k,x:p.x,y:p.y,hp,max:hp,cd:0,rt:0,dir:2,ph:Math.random()*6,moving:true})}
+   const hp=E.hp*mul*(q.k==='boss'?(G.mods.bossHp||1):1)*(q.k==='bear'?(G.mods.bearHp||1):1)*(q.k==='boar'?1+BOAR_NIGHT_HP*Math.max(0,n-BOAR_FROM):1);if(q.k==='boar')hooks.toast(G.spawnQ.some(x=>x.k==='boar')?'🐗 '+E.name+'来了！今晚有 '+BOAR_N+' 只，血很厚，集中火力！':BOAR_N>1?'🐗 又一只'+E.name+'来了！':'🐗 '+E.name+'来了！血很厚，集中火力！');G.enemies.push({id:uid++,k:q.k,x:p.x,y:p.y,hp,max:hp,cd:0,rt:0,dir:2,ph:Math.random()*6,moving:true})}
   for(const e of G.enemies)if(!e.dead)stepEnemy(e,dt);for(const e of G.enemies)if(!e.dead)tickBurn(e,dt);stepSnacks(dt);
   // 互相挤开
   const es=G.enemies,sx0=es.map(e=>e.x),sy0=es.map(e=>e.y);for(let i=0;i<es.length;i++)for(let k=i+1;k<es.length;k++){const a=es[i],b=es[k],rr=ENEMIES[a.k].r+ENEMIES[b.k].r,dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);if(d>0&&d<rr){const o=(rr-d)/2*.5;a.x-=dx/d*o;a.y-=dy/d*o;b.x+=dx/d*o;b.y+=dy/d*o}}

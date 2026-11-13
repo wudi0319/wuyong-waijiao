@@ -98,7 +98,7 @@ const ENEMIES={
  raccoon:{name:'小偷浣熊',hp:22,spd:1.65,dmg:5,cd:.8,gold:1,r:.35,aggro:3.5,throw:3.5},
  wolf:{name:'大灰狼',hp:48,spd:1.32,dmg:8,cd:1,gold:2,r:.45,aggro:2.6},
  bear:{name:'大笨熊',hp:180,spd:.8,dmg:21,cd:1.4,gold:6,r:.65,aggro:1.6,smash:1},
- boar:{name:'大野猪',hp:500,spd:.62,dmg:26,cd:1.6,gold:10,r:.8,aggro:1.6,smash:1,mini:1},
+ boar:{name:'大野猪',hp:350,spd:.496,dmg:26,cd:1.6,gold:10,r:.8,aggro:1.6,smash:1,mini:1},
  boss:{name:'熊大王',hp:1100,spd:.7,dmg:36,cd:1.5,gold:30,r:.95,aggro:2,smash:1}};
 // 墙段几何：segs = [{x,y,len,v,gate}]，gate 为门洞半宽（0 表示没门）
 const WALL_HT=.4,GATE_W=1.15;
@@ -238,15 +238,15 @@ useMap('yard');
 function nightDirs(n){const a=(MAP&&MAP.nightsDir)||ND_STD;return a[Math.min(n,a.length)-1]||a[a.length-1]}
 // 怪物数量：用户 2026-11-13 要求每关每夜 +15%；精英（大灰狼、大笨熊）前 3 夜再 +10%，第 4 夜起再 +35%（熊大王不变）
 // 大野猪：用户 2026-11-13 要求每关第 4 夜起每夜多一个血很厚的大怪；血量除了通用的夜数成长，第 4 夜之后每夜再 +4%（合计每夜约 +15%）
-const BOAR_FROM=4,BOAR_NIGHT_HP=.04;
+const BOAR_FROM=4,BOAR_NIGHT_HP=.04,BOAR_N=2; // 用户 2026-11-13 改：大野猪走慢 20%、血量 -30%、每夜 2 只
 const WAVE_COUNT=1.15,WAVE_ELITE_EARLY=1.1,WAVE_ELITE_LATE=1.35;
 // 两种小兵各自的指令按钮图标
 const UNIT_IC={kitten:'🪓',duck:'🏹'};
 function waveFor(n,cm=1){const dirs=nightDirs(n),out=[],dur=22+n*5,m=(typeof G!=='undefined'&&G&&G.mods)||{},sp=m.espawn||1;
  const em=n>=4?WAVE_ELITE_LATE:WAVE_ELITE_EARLY,add=(k,c0,t0=0,t1=dur)=>{const cnt=k==='boss'?c0:Math.round(c0*cm*1.18*WAVE_COUNT*(k==='wolf'||k==='bear'?em:1));for(let i=0;i<cnt;i++)out.push({t:(t0+(t1-t0)*(cnt>1?i/(cnt-1):.5))/sp+Math.random()*1.5,dir:dirs[(i+out.length)%dirs.length],k})};
  add('raccoon',5+n*2);if(n>=2||m.earlyWolf)add('wolf',n>=2?n*2-1:2,4);if(n>=3)add('bear',n-2,8);
- // 第 4 夜起每夜固定多 1 只血很厚的大野猪（小头目，不受数量倍率影响），夜里中段从当晚的某一路出来，按夜数轮换方向
- if(n>=BOAR_FROM){const bt=dur*.5/sp+Math.random()*1.5;out.push({t:bt,dir:dirs[(n-BOAR_FROM)%dirs.length],k:'boar'})}
+ // 第 4 夜起每夜固定多 BOAR_N 只血很厚的大野猪（小头目，不受数量倍率影响）：夜里中段错开出来，尽量走当晚不同的两路，按夜数轮换方向
+ if(n>=BOAR_FROM)for(let i=0;i<BOAR_N;i++){const bt=dur*(.42+.16*i)/sp+Math.random()*1.5;out.push({t:bt,dir:dirs[(n-BOAR_FROM+i)%dirs.length],k:'boar'})}
  if(n===NIGHTS){const bt=dur*(m.bossEarly||.6);add('boss',1,bt,bt)}
  return out.sort((a,b)=>a.t-b.t)}
 // 下一级（或刚建造的 1 级）加成说明，给建造按钮用
