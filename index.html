@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <title>无用外交</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head><body>
 <main id="stage"><canvas id="map"></canvas>
  <div id="hud">
@@ -24,7 +24,7 @@
  <div id="toast"></div>
  <div id="joy"><div id="knob"></div></div>
  <div id="acts">
-  <div id="armyRow" class="armyRow hidden"><button id="followBtn" class="act sq">⚔️ 跟随</button><button id="deployBtn" class="act sq">🚩 原地部署</button></div>
+  <div id="armyRow" class="armyRow hidden"><button id="armyKit" class="act sq army hidden"></button><button id="armyDuck" class="act sq army hidden"></button></div>
   <button id="homeBtn" class="act home hidden"></button>
   <button id="buildBtn" class="act hidden"></button>
   <button id="razedBtn" class="act hidden"></button>
@@ -49,7 +49,7 @@
  <button id="goBtn" class="big">出发！</button>
  <p class="rec" id="rec"></p>
 </div></div>
-<div id="pause" class="ov hidden"><div class="card"><div class="bigic">⏸</div><h2>暂停中</h2><button id="resumeBtn" class="big">继续</button><div class="row" style="margin-top:12px"><button id="muteBtn" class="sm"></button><button id="quitBtn" class="sm">回到开始</button></div><p class="sub" style="margin-top:10px">电脑上：WASD 走路 · E 建造 / 升级城堡 · N 入夜 · 空格 技能 · F 跟随/部署 · P 暂停</p></div></div>
+<div id="pause" class="ov hidden"><div class="card"><div class="bigic">⏸</div><h2>暂停中</h2><button id="resumeBtn" class="big">继续</button><div class="row" style="margin-top:12px"><button id="muteBtn" class="sm"></button><button id="quitBtn" class="sm">回到开始</button></div><p class="sub" style="margin-top:10px">电脑上：WASD 走路 · E 建造 / 升级城堡 · N 入夜 · 空格 技能 · 1 / 2 两种兵各自 跟随/驻守 · F 全部切换 · P 暂停</p></div></div>
 <div id="prep" class="ov hidden"><div class="card prep-card">
  <h2 id="prepTitle">准备出发</h2>
  <p class="prep-stars" id="prepStars"></p>
@@ -77,9 +77,9 @@
  <button id="homeUpCancel" class="sm" style="margin-top:10px">先不升</button>
 </div></div>
 <div id="end" class="ov hidden"><div class="card"><div id="endIcon" class="bigic"></div><h2 id="endTitle"></h2><p id="endStars" class="end-stars"></p><p id="endText"></p><p id="endUnlock" class="unl"></p><button id="againBtn" class="big">再来一次</button></div></div>
-<script src="js/sfx.js?v=7"></script>
-<script src="js/sprites.js?v=7"></script>
-<script src="js/data.js?v=7"></script>
-<script src="js/game.js?v=7"></script>
-<script src="js/ui.js?v=7"></script>
+<script src="js/sfx.js?v=8"></script>
+<script src="js/sprites.js?v=8"></script>
+<script src="js/data.js?v=8"></script>
+<script src="js/game.js?v=8"></script>
+<script src="js/ui.js?v=8"></script>
 </body></html>

@@ -112,9 +112,9 @@ $('branchCancel').onclick=()=>{SFX.play('click');closeBranch()};
 tap('buildBtn',()=>{const p=me();if(!p)return;const s=Game.nearSpot(p);if(s)openBranch(s)});
 tap('razedBtn',()=>{const p=me();if(p)Game.demolish(p.id)});
 tap('homeBtn',()=>{const p=me();if(p)openHomeUp()});
-tap('nightBtn',()=>{Game.startNight();tut.on('night')});
+tap('nightBtn',()=>{if(Game.G&&Game.G.units.length)localStorage.setItem('wuyong-armytip','1');Game.startNight();tut.on('night')});
 tap('skillBtn',()=>{const p=me();if(p&&p.skillCd<=0&&Game.skill(p.id))tut.on('skill')});
-tap('followBtn',()=>{const p=me();if(p)Game.armyFollow(p.id)});tap('deployBtn',()=>{const p=me();if(p)Game.armyDeploy(p.id)});
+tap('armyKit',()=>{const p=me();if(p)Game.toggleArmy(p.id,'kitten')});tap('armyDuck',()=>{const p=me();if(p)Game.toggleArmy(p.id,'duck')});
 // ---- 暂停 / 音效 ----
 let paused=false;
 function setPause(v){const G=Game.G;if(!G||!$('start').classList.contains('hidden')||G.phase==='win'||G.phase==='lose')v=false;paused=v;$('pause').classList.toggle('hidden',!v);jv={x:0,y:0};knob.style.transform='';keys.clear()}
@@ -139,7 +139,7 @@ addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(k==='escape'&&$('b
  if(['w','a','s','d','arrowleft','arrowright','arrowup','arrowdown'].includes(k))tut.on('move');
  if(k==='e'||k==='enter'){if(!$('buildBtn').classList.contains('hidden'))$('buildBtn').click();else if(!$('homeBtn').classList.contains('hidden'))$('homeBtn').click()}
  if(k===' '){e.preventDefault();$('skillBtn').classList.contains('hidden')||$('skillBtn').click()}
- if(k==='n')$('nightBtn').classList.contains('hidden')||$('nightBtn').click();if(k==='f'){const p=me();if(p&&Game.G.units.length)Game.toggleArmy(p.id)}});
+ if(k==='n')$('nightBtn').classList.contains('hidden')||$('nightBtn').click();if(k==='f'){const p=me();if(p&&Game.G.units.length)Game.toggleArmy(p.id)}if(k==='1'||k==='2'){const p=me(),uk=k==='1'?'kitten':'duck';if(p&&Game.G.units.some(u=>u.k===uk))Game.toggleArmy(p.id,uk)}});
 addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>keys.clear());
 function readInput(){let x=jv.x,y=jv.y;if(keys.has('a')||keys.has('arrowleft'))x-=1;if(keys.has('d')||keys.has('arrowright'))x+=1;if(keys.has('w')||keys.has('arrowup'))y-=1;if(keys.has('s')||keys.has('arrowdown'))y+=1;
  const m=Math.hypot(x,y);return m>1?{x:x/m,y:y/m}:{x,y}}
@@ -172,11 +172,12 @@ function hud(){const G=Game.G,p=me();if(!G||!p)return;const day=G.phase==='day',
  if(hc!=null){setH('homeBtn',false);setT('homeBtn',`🏰 升级城堡（${G.home.up+1}/3）💰${hc}`);$('homeBtn').classList.toggle('poor',G.gold<hc)}else setH('homeBtn',true);
  setH('nightBtn',!day||!play);
  const W=WEAPONS[p.weapon];setH('skillBtn',G.phase!=='night');setT('skillName',W.skill.name);setT('skillCd',p.skillCd>0?''+Math.ceil(p.skillCd):'');
- setH('armyRow',!play||!G.units.length);$('followBtn').classList.toggle('on',G.army.mode==='follow');$('deployBtn').classList.toggle('on',G.army.mode==='deploy');
+ setH('armyRow',!play||!G.units.length);for(const[id,k]of[['armyKit','kitten'],['armyDuck','duck']]){const has=play&&G.units.some(u=>u.k===k);setH(id,!has);if(!has)continue;const md=G.army[k].mode,el=$(id),html=`${UNIT_IC[k]} ${md==='follow'?'⚔️跟随':md==='deploy'?'🚩驻守':'🏠守营'}<small>${md==='follow'?'点一下：守在这里':'点一下：跟我走'}</small>`;if(el._v!==html){el._v=html;el.innerHTML=html}el.classList.toggle('on',md==='follow');el.classList.toggle('hold',md==='deploy')}
  const mm=Math.round(Game.view.mm.s)+(Game.view.mm.big?1:0);if(mm!==hudMM){hudMM=mm;const M=Game.view.mm,st=$('stage').style,wide=innerWidth-M.s>300;
   // 小地图放大时：横屏把提示放到地图右边；竖屏放到地图下面，不挡地图
   st.setProperty('--mm',(!M.big||wide?Math.round(M.s):0)+'px');st.setProperty('--hudb',Math.round(M.big&&!wide?M.y+M.s+4:$('hud').getBoundingClientRect().bottom)+'px');placeToast()}
  const tt=tut.text(G);let h=tt;
+ if(!h&&day&&G.units.length&&!localStorage.getItem('wuyong-armytip'))h='🪓🏹 右下角两个按钮各管一种兵：「跟随」跟你走，「驻守」守在你站的位置，可以分头守两路';
  if(!h){if(day){const tip=MAP.id==='mountain'?'沿盘山公路一层一层守，守不住就往上撤':MAP.id==='bridge'?'守住桥上的门，别让它们过河':MAP.id==='fields'?'四个菜园各自围起来':'把门建好，只有自己人能过';h=s?'点右下角按钮建造 / 升级':'今晚敌人从'+nightDirs(G.night+1).map(d=>DIRS[d].cn).join('、')+'边来 · '+tip}
   else if(G.phase==='night')h=p.dead?`${DOGS[p.dog].name}复活中… ${Math.ceil(p.respawn)}`:`敌人还剩 ${G.enemies.length+G.spawnQ.length} 个 · 靠近会自动打`;else h=''}
  if($('hint')._v!==h||$('hint').classList.contains('tut')!==!!tt){setT('hint',h);$('hint').classList.toggle('tut',!!tt);placeToast()}

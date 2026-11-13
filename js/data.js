@@ -235,8 +235,12 @@ function refreshDirs(){DIRS={N:{x:HOME.x,y:-.5,cn:'北'},S:{x:HOME.x,y:MAP_H+.5,
 function useMap(id){MAP=MAPS[id]||MAPS.yard;MAP_W=MAP.w;MAP_H=MAP.h;HOME=MAP.home;SPOTS=MAP.spots;NIGHTS=MAP.nights||7;refreshDirs();return MAP}
 useMap('yard');
 function nightDirs(n){const a=(MAP&&MAP.nightsDir)||ND_STD;return a[Math.min(n,a.length)-1]||a[a.length-1]}
+// 怪物数量：用户 2026-11-13 要求每关每夜 +15%；精英（大灰狼、大笨熊）前 3 夜再 +10%，第 4 夜起再 +35%（熊大王不变）
+const WAVE_COUNT=1.15,WAVE_ELITE_EARLY=1.1,WAVE_ELITE_LATE=1.35;
+// 两种小兵各自的指令按钮图标
+const UNIT_IC={kitten:'🪓',duck:'🏹'};
 function waveFor(n,cm=1){const dirs=nightDirs(n),out=[],dur=22+n*5,m=(typeof G!=='undefined'&&G&&G.mods)||{},sp=m.espawn||1;
- const add=(k,c0,t0=0,t1=dur)=>{const cnt=k==='boss'?c0:Math.round(c0*cm*1.18);for(let i=0;i<cnt;i++)out.push({t:(t0+(t1-t0)*(cnt>1?i/(cnt-1):.5))/sp+Math.random()*1.5,dir:dirs[(i+out.length)%dirs.length],k})};
+ const em=n>=4?WAVE_ELITE_LATE:WAVE_ELITE_EARLY,add=(k,c0,t0=0,t1=dur)=>{const cnt=k==='boss'?c0:Math.round(c0*cm*1.18*WAVE_COUNT*(k==='wolf'||k==='bear'?em:1));for(let i=0;i<cnt;i++)out.push({t:(t0+(t1-t0)*(cnt>1?i/(cnt-1):.5))/sp+Math.random()*1.5,dir:dirs[(i+out.length)%dirs.length],k})};
  add('raccoon',5+n*2);if(n>=2||m.earlyWolf)add('wolf',n>=2?n*2-1:2,4);if(n>=3)add('bear',n-2,8);
  if(n===NIGHTS){const bt=dur*(m.bossEarly||.6);add('boss',1,bt,bt)}
  return out.sort((a,b)=>a.t-b.t)}

@@ -203,3 +203,9 @@ body.on-modal #joy,body.on-modal #acts{visibility:hidden;pointer-events:none}
 .dog-passive,.prep-passive{margin:6px auto 2px;padding:6px 10px;max-width:420px;border-radius:12px;background:linear-gradient(90deg,#fff4d6,#ffe6c7);border:2px dashed #f0a35e;color:#6b3f1d;font-size:13px;line-height:1.35;text-align:left}
 .dog-passive b,.prep-passive b{display:block;font-size:14px;color:#c0561b}
 .dog-passive span,.prep-passive span{display:block}
+
+/* 两种小兵各自的跟随/驻守按钮 */
+.act.sq.army{display:flex;flex-direction:column;align-items:center;line-height:1.15;padding:6px 10px;min-width:92px}
+.act.sq.army small{display:block;font-size:10px;font-weight:700;opacity:.75;margin-top:1px}
+.act.sq.army.hold{background:#ffe1dc;box-shadow:0 4px 0 #d98a7e;outline:3px solid #ff5a5a}
+.act.sq.army.hidden{display:none}

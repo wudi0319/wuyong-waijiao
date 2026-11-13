@@ -14,7 +14,7 @@ function newGame(o){useMap(o.map||'yard');rebuildDecor();
  G={phase:'day',night:0,gold:(MAP.gold||15)+(mods.start||0),t:0,nightT:0,spawnQ:[],buffs,debuffs,talents:buffs,mods,map:MAP.id,
   home:{hp:300*mods.stone,max:300*mods.stone,cd:0,hurtT:0,up:0,picks:[],bdmg:5,bcd:1.2,brange:3.8,regen:0,stipend:0,aura:1,beds:0,cozy:0,guard:0},
   players:{},me:o.dog,b:{},enemies:[],units:[],shots:[],fx:[],floats:[],coins:[],snacks:[],
-  input:{},army:{mode:'camp',leader:null,x:0,y:0},dark:0,shake:0,stats:{kills:0,broke:0,stars:0,starGain:0}};
+  input:{},army:{kitten:{mode:'camp',leader:null,x:0,y:0},duck:{mode:'camp',leader:null,x:0,y:0}},dark:0,shake:0,stats:{kills:0,broke:0,stars:0,starGain:0}};
  G.home.bpicks=[];for(const s of SPOTS)G.b[s.id]={lv:0,hp:0,max:0,cd:0,dead:0,picks:[]};
  view.mm.big=false;view.guide=null;addPlayer(o.dog,o.dog,o.weapon);navDirty=1;rebuildNav();cam.x=HOME.x;cam.y=HOME.y;return G}
 function addPlayer(id,dog,weapon){const max=100*G.mods.hp;let x=HOME.x,y=HOME.y+2.2;
@@ -122,10 +122,14 @@ function syncUnits(){for(const s of SPOTS){if(s.t!=='cats'&&s.t!=='ducks')contin
  const mine=G.units.filter(u=>u.home===s.id);
  for(let i=mine.length;i<n2;i++){const max=U.hp*G.mods.pet*(1+.25*(b.lv-1))*hm;G.units.push({id:uid++,home:s.id,k:BUILD[s.t].unit,slot:i,x:s.x,y:s.y+.8,hp:max,max,cd:0,dead:0,respawn:0,dir:0,ph:0,moving:false})}
  for(const u of G.units.filter(u=>u.home===s.id)){const nm=U.hp*G.mods.pet*(1+.25*(b.lv-1))*hm;if(nm>u.max)u.hp+=nm-u.max;u.max=nm}}}
-// 小兵指令：follow 跟随玩家；deploy 原地部署（插旗守这里）；camp 默认守在各自兵营
-function armyFollow(pid){if(!G.units.length){hooks.toast('先建刀斧营或弓箭营吧');return}G.army.mode='follow';G.army.leader=pid;sfx('click');hooks.toast('⚔️ 士兵们跟着'+DOGS[G.players[pid].dog].name+'走！')}
-function armyDeploy(pid){if(!G.units.length){hooks.toast('先建刀斧营或弓箭营吧');return}const p=G.players[pid];G.army.mode='deploy';G.army.leader=null;G.army.x=p.x;G.army.y=p.y;sfx('click');hooks.toast('🚩 士兵们守在这里！')}
-function toggleArmy(pid){G.army.mode==='follow'?armyDeploy(pid):armyFollow(pid)}
+// 小兵指令（两种小兵各自独立）：follow 跟随玩家；deploy 原地驻守（插旗守在按下时玩家站的位置）；camp 默认守在各自兵营。k 不传 = 两种一起
+const ARMY_KS=['kitten','duck'];
+function hasUnits(k){return G.units.some(u=>!k||u.k===k)}
+function armyKs(k){return k?[k]:ARMY_KS.filter(hasUnits)}
+function armyWho(k){return k?UNITS[k].name+'们':'士兵们'}
+function armyFollow(pid,k){if(!hasUnits(k)){hooks.toast(k?'还没有'+UNITS[k].name+'，先建'+BUILD[k==='kitten'?'cats':'ducks'].name+'吧':'先建刀斧营或弓箭营吧');return}for(const q of armyKs(k)){const A=G.army[q];A.mode='follow';A.leader=pid}sfx('click');hooks.toast((k?UNIT_IC[k]:'⚔️')+' '+armyWho(k)+'跟着'+DOGS[G.players[pid].dog].name+'走！')}
+function armyDeploy(pid,k){if(!hasUnits(k)){hooks.toast(k?'还没有'+UNITS[k].name+'，先建'+BUILD[k==='kitten'?'cats':'ducks'].name+'吧':'先建刀斧营或弓箭营吧');return}const p=G.players[pid];for(const q of armyKs(k)){const A=G.army[q];A.mode='deploy';A.leader=null;A.x=p.x;A.y=p.y}sfx('click');hooks.toast('🚩 '+armyWho(k)+'守在这里！')}
+function toggleArmy(pid,k){const ks=armyKs(k);ks.some(q=>G.army[q].mode==='follow')?armyDeploy(pid,k):armyFollow(pid,k)}
 // ---- 战斗 ----
 // 击退：一步步推，碰到悬崖/河/地图边就停，不会把敌人打到崖下或对岸
 function knockE(e,dx,dy){const r=ENEMIES[e.k].r,n=Math.max(1,Math.ceil(Math.hypot(dx,dy)/.1));for(let i=0;i<n;i++){const nx=e.x+dx/n,ny=e.y+dy/n;if(nx<.4||ny<.4||nx>MAP_W-.4||ny>MAP_H-.4||terrainBlock(nx,ny,r)||(!enemySolid(e.x,e.y,r)&&enemySolid(nx,ny,r)))break;e.x=nx;e.y=ny}}
@@ -279,9 +283,9 @@ function stepEnemy(e,dt){const E=ENEMIES[e.k];e.cd-=dt;e.flash=Math.max(0,(e.fla
   const gx=Math.round(e.x/CELL)*CELL-e.x,gy=Math.round(e.y/CELL)*CELL-e.y,gd=Math.hypot(gx,gy);
   if(gd>.02){const k=Math.min(sp,gd)/gd,cx=e.x+gx*k,cy=e.y+gy*k;if(!terrainBlock(cx,cy,E.r)&&!enemySolid(cx,cy,E.r)){e.x=cx;e.y=cy;e.moving=true;e.ph+=dt*9}}return}
  e.x=nx;e.y=ny;e.moving=true;e.ph+=dt*9;if(Math.abs(dx)>.05)e.dir=dx<0?2:3}
-function unitAnchor(u){const A=G.army,L=A.leader&&G.players[A.leader];
+function unitAnchor(u){const A=G.army[u.k]||G.army.kitten,L=A.leader&&G.players[A.leader];
  if(A.mode==='follow'&&L){if(!L.dead){A.x=L.x;A.y=L.y}}
- if(A.mode!=='camp'){const n=G.units.length,i=G.units.indexOf(u),a=i/n*Math.PI*2+(A.mode==='follow'?Math.PI/2:0),r=n>5?1.5:1.2;return{x:A.x+Math.cos(a)*r,y:A.y+Math.sin(a)*r*.8}}
+ if(A.mode!=='camp'){const same=G.units.filter(v=>v.k===u.k),n=same.length,i=same.indexOf(u),a=i/n*Math.PI*2+(A.mode==='follow'?Math.PI/2:0),r=n>5?1.5:1.2;return{x:A.x+Math.cos(a)*r,y:A.y+Math.sin(a)*r*.8}}
  const a=u.slot*2.4+(u.k==='duck'?1.2:0),s=spotOf(u.home);return{x:s.x+Math.cos(a)*1.1,y:s.y+.6+Math.sin(a)*.7}}
 // 小兵卡在塔/墙角之间（两个方向都走不动）：挪到旁边一个可走的寻路格中心，挑离目标最近的
 function unstickUnit(u,sp,goal,force){if(navDirty||!navFriend)rebuildNav();const ix=Math.round(u.x/CELL),iy=Math.round(u.y/CELL);let best=null,bd=1e9;
@@ -610,10 +614,10 @@ function drawMapLabels(ns){if(!G)return;ctx.setTransform(DPR,0,0,DPR,0,0);const 
 function drawWarn(d){const D=DIRS[d],x=clamp(D.x,1,MAP_W-1),y=clamp(D.y,1,MAP_H-1),X=sx(x),Y=sy(y),p=1+Math.sin(performance.now()/200)*.08;
  ctx.save();ctx.translate(X,Y);ctx.scale(p,p);ctx.fillStyle='#f06464';ctx.strokeStyle='#fff';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,T*.5,0,7);ctx.fill();ctx.stroke();
  ctx.fillStyle='#fff';ctx.font=`900 ${T*.6}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!',0,2);ctx.restore()}
-function drawFlag(x,y){const X=sx(x),Y=sy(y),t=performance.now()/1000;ctx.save();
- ctx.strokeStyle='rgba(255,90,90,.7)';ctx.lineWidth=2.5;ctx.setLineDash([5,4]);ctx.beginPath();ctx.ellipse(X,Y,T*(1.3+.08*Math.sin(t*4)),T*.9,0,0,7);ctx.stroke();ctx.setLineDash([]);
- ctx.fillStyle='#6b4a32';ctx.fillRect(X-1.5,Y-T*1.3,3,T*1.3);ctx.fillStyle='#ff5a5a';ctx.strokeStyle='#3b2a20';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(X+1.5,Y-T*1.3);
- ctx.quadraticCurveTo(X+T*.35,Y-T*(1.25+.05*Math.sin(t*6)),X+T*.7,Y-T*1.12);ctx.lineTo(X+1.5,Y-T*.85);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore()}
+function drawFlag(x,y,col='#ff5a5a',ic=''){const X=sx(x),Y=sy(y),t=performance.now()/1000;ctx.save();
+ ctx.strokeStyle=col+'b3';ctx.lineWidth=2.5;ctx.setLineDash([5,4]);ctx.beginPath();ctx.ellipse(X,Y,T*(1.3+.08*Math.sin(t*4)),T*.9,0,0,7);ctx.stroke();ctx.setLineDash([]);
+ ctx.fillStyle='#6b4a32';ctx.fillRect(X-1.5,Y-T*1.3,3,T*1.3);ctx.fillStyle=col;ctx.strokeStyle='#3b2a20';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(X+1.5,Y-T*1.3);
+ ctx.quadraticCurveTo(X+T*.35,Y-T*(1.25+.05*Math.sin(t*6)),X+T*.7,Y-T*1.12);ctx.lineTo(X+1.5,Y-T*.85);ctx.closePath();ctx.fill();ctx.stroke();if(ic){ctx.font=Math.round(T*.55)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(ic,X+T*.38,Y-T*1.6)}ctx.restore()}
 // 屏幕外的敌人：屏幕边缘画红箭头（按方向合并，显示数量）
 function drawOffscreen(W,H){const top=Math.max(view.top,view.hintB||0)+10,bot=H-8,lft=8,rgt=W-8,cx=W/2,cy=(top+bot)/2,B={};
  for(const e of G.enemies){const X=sx(e.x),Y=sy(e.y);if(X>0&&X<W&&Y>top-10&&Y<H)continue;const a=Math.atan2(Y-cy,X-cx),k=Math.round(a/(Math.PI/10));const d=Math.hypot(X-cx,Y-cy);
@@ -646,7 +650,7 @@ function drawMinimap(W,H){const m=view.mm,base=Math.max(84,Math.min(118,Math.min
  if(terr&&terr.bridges){ctx.fillStyle='#c98b52';for(const q of terr.bridges)ctx.fillRect(X0+q.x*k,Y0+q.y*k,q.w*k,q.h*k)}
  for(const s of SPOTS){const b=G.b[s.id];if(s.t==='wall'){for(const g of segsOf(s)){const[x,y]=P(g.x,g.y),L=g.len*k,h=Math.max(2,WALL_HT*2.2*k);ctx.fillStyle=!b.lv?'rgba(255,248,231,.4)':b.dead?'#8a8f99':'#c98b52';if(g.v)ctx.fillRect(x-h/2,y-L/2,h,L);else ctx.fillRect(x-L/2,y-h/2,L,h);if(b.lv&&!b.dead&&g.gate){ctx.fillStyle='#ecd29a';const gw=g.gate*2*k;g.v?ctx.fillRect(x-h/2-1,y-gw/2,h+2,gw):ctx.fillRect(x-gw/2,y-h/2-1,gw,h+2)}}}else{if(!b.lv)continue;const[x,y]=P(s.x,s.y);ctx.fillStyle=b.dead?'#8a8f99':s.t==='tower'?'#f08a7a':s.t==='farm'?'#b5835a':'#ffd23f';ctx.fillRect(x-2.5,y-2.5,5,5)}}
  {const[x,y]=P(HOME.x,HOME.y);ctx.fillStyle=G.home.hurtT>0&&Math.sin(t*20)>0?'#ff5a5a':'#fff6e0';ctx.strokeStyle='#6b4a32';ctx.lineWidth=1.5;ctx.beginPath();ctx.rect(x-5,y-5,10,10);ctx.fill();ctx.stroke();ctx.fillStyle='#e8a36a';ctx.beginPath();ctx.moveTo(x-6,y-4);ctx.lineTo(x,y-9);ctx.lineTo(x+6,y-4);ctx.fill()}
- if(G.army.mode==='deploy'){const[x,y]=P(G.army.x,G.army.y);ctx.fillStyle='#ff5a5a';ctx.fillRect(x,y-7,5,4);ctx.fillStyle='#6b4a32';ctx.fillRect(x-.5,y-7,1.5,8)}
+ for(const q of ARMY_KS){const A=G.army[q];if(A.mode!=='deploy')continue;const[x,y]=P(A.x,A.y);ctx.fillStyle=q==='duck'?'#4a8cff':'#ff5a5a';ctx.fillRect(x,y-7,5,4);ctx.fillStyle='#6b4a32';ctx.fillRect(x-.5,y-7,1.5,8)}
  for(const u of G.units)if(!u.dead){const[x,y]=P(u.x,u.y);ctx.fillStyle=u.k==='duck'?'#ffe066':'#ffb86b';ctx.fillRect(x-1.5,y-1.5,3,3)}
  for(const e of G.enemies){const[x,y]=P(e.x,e.y),r=ENEMIES[e.k].smash?3:2;ctx.fillStyle='#f02e2e';ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fill()}
  for(const p of Object.values(G.players))if(!p.dead){const[x,y]=P(p.x,p.y);ctx.fillStyle=p.dog==='white'?'#fff':'#ecca92';ctx.strokeStyle='#3b2a20';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fill();ctx.stroke()}
@@ -685,7 +689,7 @@ function render(){const W=VW,H=VH;ctx.setTransform(DPR,0,0,DPR,0,0);const me=G&&
  for(const e of G.enemies)L.push({y:e.y,f:()=>{const atk=e.wind>0?{ph:'wind',p:1-e.wind/(e.windMax||.2)}:e.atk>0?{ph:'hit',p:1-e.atk/(e.atkMax||.22)}:null;
   const lu=(e.atk>0?Math.sin((1-e.atk/(e.atkMax||.22))*Math.PI)*.28:0),ax=Math.cos(e.atkA||0)*lu,ay=Math.sin(e.atkA||0)*lu;
   spr(critter,e.x+ax,e.y+ay,ENEMIES[e.k].r*2.3,e.k,e.dir,e.ph,e.moving&&!atk,e.flash>0,atk);if(e.burnT>0)drawFlames(e)}});
- if(G.army.mode==='deploy')L.push({y:G.army.y,f:()=>drawFlag(G.army.x,G.army.y)});
+ for(const q of ARMY_KS){const A=G.army[q];if(A.mode==='deploy'&&hasUnits(q))L.push({y:A.y,f:()=>drawFlag(A.x,A.y,q==='duck'?'#4a8cff':'#ff5a5a',UNIT_IC[q])})}
  L.sort((a,b)=>a.y-b.y).forEach(o=>o.f());
  for(const s of G.shots){const X=sx(s.x),Y=sy(s.y)-(s.z||0)*T;ctx.save();ctx.translate(X,Y);ctx.lineWidth=2;ctx.strokeStyle='#3b2a20';
   if(s.kind==='frisbee'){ctx.rotate(s.t*20);heldW(ctx,'frisbee',T*.75)}
