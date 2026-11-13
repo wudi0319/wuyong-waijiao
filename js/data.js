@@ -82,10 +82,12 @@ const HOME_UPS={
  banker:{name:'零钱罐',ic:'🏦',cat:'econ',desc:'早上按手里剩钱再收 10% 利息（最多 6）'},
  bargain:{name:'讨价还价',ic:'🗣️',cat:'econ',desc:'这局建造和升级再便宜 15%'}
 };
+// 弹弓塔整体削弱：用户 2026-11-13 要求伤害、血量各 -10%（所有关卡、所有等级和路线，路线百分比照旧按此基数算）
+const TOWER_NERF=0.9;
 // 建筑每级数值（下标 0 = 1级）
 const BUILD={
  wall:{name:'城墙',ic:'🧱',cost:[3,6,12],hp:[150,300,480],armor:[0,.12,.25]},
- tower:{name:'弹弓塔',ic:'🏹',cost:[8,14,22],hp:[80,140,220],dmg:[7,12,18],range:[5,5.6,6.2],cd:[.9,.75,.6]},
+ tower:{name:'弹弓塔',ic:'🏹',cost:[8,14,22],hp:[80,140,220].map(v=>Math.round(v*TOWER_NERF)),dmg:[7,12,18].map(v=>+(v*TOWER_NERF).toFixed(2)),range:[5,5.6,6.2],cd:[.9,.75,.6]},
  cats:{name:'刀斧营',ic:'🐱',cost:[8,14,22],hp:[120,200,300],n:[2,3,4],unit:'kitten',rev:[20,16,12]},
  ducks:{name:'弓箭营',ic:'🐤',cost:[8,14,22],hp:[120,200,300],n:[2,3,4],unit:'duck',rev:[20,16,12]},
  farm:{name:'菜园',ic:'🥕',cost:[5,10,16],hp:[60,90,130],gold:[3,5,8]}};
